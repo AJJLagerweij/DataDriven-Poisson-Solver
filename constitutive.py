@@ -1,20 +1,29 @@
 r"""
-A collection of arbitrary constitutive models for beam equations.
+A collection of arbitrary constitutive models for Poisson equations.
 
 The data-driven method should be independent of the constitutive equation considered. It is however included for two
-reasons. Firstly the database is created in-silico which requires the use of a traditional method to calculate the
-deflection, these methods require constitutive equations. Secondly the constitutive equation can be used to evaluated
-the performance of the data-driven method by comparing it to other traditional norms such as the total potential energy.
-This does also require a constitutive equation.
+reasons. Firstly the database is created in-silico, which requires a traditional method to solve the Poisson problem,
+these methods require constitutive equations. Secondly the constitutive equation can be used to evaluate the
+performance of the data-driven method by comparing its solution to reference solutions that also depend on
+traditional methods.
+
+In general the Poisson problem is formulated as:
+
+.. math::
+    \nabla^2 f(u(x)) = g(x)\\
+
+    \text{where:}  u(x) = \tilde{u} \quad \forall x\in\Gamma
+
+Here we define math:`f(u(x))` as the constitutive equation.
 
 .. note:: Any future class should be a child of the :py:class:`~constitutive.Constitutive` which specifies the minimal
     information that is to be available in a constitutive class. It will provide errors if any of the required functions
     are not implemented by the child class.
 
-Bram Lagerweij |br|
+Bram van der Heijden |br|
 Mechanics of Composites for Energy and Mobility |br|
 KAUST |br|
-2021
+2023
 """
 
 # Importing required modules.
@@ -43,287 +52,128 @@ class Constitutive(ABC):
         pass
 
     @abstractmethod
-    def moment(self, uxx):
+    def field_to_potential(self, u):
         r"""
-        The material model converts kinematic derivative :math:`\kappa` into internal static :math:`M`.
+        The constitutive equation.
+
+        The constitutive equation model converts the field :math:`u` into the potential :math:`f(u)`.
 
         Parameters
         ----------
-        uxx : array
-            Curvatures to be converted into moments.
+        u : array
+            The field to be converted into the potential.
 
         Returns
         -------
-        array
-            The moments that related to the curvature though the constitutive equation..
+        potential
+            The potential related to this field.
         """
         pass
 
     @abstractmethod
-    def curvature(self, m):
+    def potential_to_field(self, potential):
         r"""
-        The material model converts kinematic derivative :math:`\kappa` into internal static :math:`M`.
+        The inverse constitutive equation.
+
+        The material model converts the field :math:`u` into the potential :math:`f(u)`, this performs the inverse
+        operation.
 
         Parameters
         ----------
-        m : array
-            Moments to be converted into curvatures.
+        potential : array
+            Potential to be converted back into the main field.
 
         Returns
         -------
         array
-            The curvature related to the moment through the constitutive equation.
+            The unknown field :math:`u`.
         """
         pass
 
-    def plot(self, uxx):
+    def plot(self, u):
         r"""
-        Plot the constitutive equation for all given curvature values.
+        Plot the constitutive equation for the given field values.
 
         Parameters
         ----------
-        uxx : array
-            Curvatures for which the constitutive equation is plotted.
+        u : array
+            The field for which the constitutive equation is plotted.
         """
-        m = self.moment(uxx)
+        m = self.field_to_potential(u)
 
-        plt.plot(uxx, m)
+        plt.plot(u, m)
         plt.xlabel(_m(r"Curvature $u''$"))
         plt.ylabel(_m(r"Moment $M$"))
 
 
 class LinearMaterial(Constitutive):
     r"""
-    A simple linear constitutive equation for beams.
+    A simple linear constitutive equation.
 
-    This linear constitutive equation represents is traditionally used in beam problems, it assumes that
-    bending-stiffness is constant that will be called :math:`EI`.
+    This linear constitutive equation is traditionally the one used.
 
     .. math::
-            m = EI \kappa\\
-            \kappa = \frac{1}{EI} m
+            f(u(x)) = a u(x)
 
     Parameters
     ----------
-    EI : float
-        The bending stiffness as a constant.
+    a : float
+        The stiffness constant.
 
     Attributes
     ----------
-    EI : float
-        Constant bending stiffness.
+    a : float
+        The stiffness constant.
     """
-    def __init__(self, EI):
+    def __init__(self, a):
         r"""
         This simple linear constitutive equation depends on the bending stiffness :math:`EI`.
         """
         super().__init__()
-        self.EI = EI
-
-    def moment(self, uxx):
-        r"""
-        Converts curvature into internal moment.
-
-        .. math::
-            m = EI \kappa
-
-        Parameters
-        ----------
-        uxx : array
-            Second derivative of displacement filed.
-
-        Returns
-        -------
-        array
-            Internal moment :math:`m` obtained from the curvature.
-        """
-        moment = self.EI * uxx
-        return moment
-
-    def curvature(self, m):
-        r"""
-        Convert moment into curvature.
-
-        .. math::
-            \kappa = \frac{1}{EI} m
-
-        Parameters
-        ----------
-        m : array
-            Internal moment.
-
-        Returns
-        -------
-        array
-            Second derivative of the displacement field :math:`\kappa` obtained from the moment..
-        """
-        uxx = m / self.EI  # Linear material.
-        return uxx
-
-
-class Softening(Constitutive):
-    r"""
-    A simple non-linear constitutive equation for beams.
-
-    This non-linear constitutive equation represents a simple softening equation. It does retain symmetry between
-    tension and compression. It is represented by the following two equations.
-
-    .. math::
-            M = a S(\frac{\kappa}{b} - \frac{1}{2}) \quad \text{and} \quad
-            \kappa = b S^{-1}(\frac{M}{a} + \frac{1}{2})
-
-    where :math:`S` is the logistic function.
-
-    Parameters
-    ----------
-    a : float
-        The linear scaling of the stiffness response.
-    b : float
-        The non-linear scaling of the constitutive.
-
-    Attributes
-    ----------
-    a : float
-        The linear scaling of the stiffness response.
-    b : float
-        The non-linear scaling of the constitutive.
-    """
-    def __init__(self, a, b):
-        r"""
-        This simple non-linear constitutive equation contains two constants, `a` and `b`.
-        """
-        super().__init__()
         self.a = a
-        self.b = b
 
-    def moment(self, uxx):
+    def field_to_potential(self, u):
         r"""
-        Converts curvature into moment.
+        The constitutive equation.
+
+        The constitutive equation model converts the field :math:`u` into the potential :math:`f(u)`. This is
+        represented by the following equation:
 
         .. math::
-            M = a S(\frac{\kappa}{b} - \frac{1}{2})
+            f(u(x)) = a u(x)
 
         Parameters
         ----------
-        uxx : array
-            Second derivative of displacement field.
+        u : array
+            The field to be converted in the potential.
 
         Returns
         -------
         array
-            Internal moment :math:`M(x)` obtained from the curvature.
+            The potential :math:`f(u(x))`.
         """
-        moment = self.a * (expit(uxx/self.b) - 1/2)  # non-linear example material.
+        moment = self.a * u
         return moment
 
-    def curvature(self, m):
+    def potential_to_field(self, potential):
         r"""
-        Converts moment into curvature.
+        The inverse constitutive equation.
+
+        The material model converts the field :math:`u` into the potential :math:`f(u)`, this performs the inverse
+        operation. This occurs according to the following linear equation:
 
         .. math::
-            \kappa = b S^{-1}(\frac{M}{a} + \frac{1}{2})
+            u(x) = \frac{1}{a} f(x
 
         Parameters
         ----------
-        m : array
-            Internal moment.
+        potential : array
+            Potential to be converted back into the main field.
 
         Returns
         -------
         array
-            Second derivative of the displacement field :math:`\kappa` obtained from the moment.
+            The unknown field :math:`u`.
         """
-        uxx = self.b * logit(m/self.a + 0.5)  # Non-linear example material.
-        return uxx
-
-    def plot(self, uxx):
-        r"""
-        Plot the constitutive equation for all given curvature values.
-
-        Parameters
-        ----------
-        uxx : array
-            Curvatures for which the constitutive equation is plotted.
-        """
-        super().plot(uxx)
-
-        equation = _m(r"$M(u'') = a ( S(\frac{u''}{b}) - \frac{1}{2})$ \\ ")
-        constants = _m(rf"$a= {self.a}$\\ $b = {self.b}$")
-        loc = (uxx.min(), -0.9*self.moment(uxx.min()))
-        plt.annotate(equation+constants, loc)
-
-
-class Hardening(Constitutive):
-    r"""
-    A basic hardening equation for beams.
-
-    This non-linear constitutive equation represents hardening. It does retain symmetry between
-    tension and compression. It is represented by the following two equations.
-
-    .. math::
-            \kappa = a S(\frac{M}{b} - \frac{1}{2}) \quad \text{and} \quad
-            M = b S^{-1}(\frac{\kappa}{a} + \frac{1}{2})
-
-    where :math:`S` is the logistic function.
-
-    Parameters
-    ----------
-    a : float
-        The linear scaling of the stiffness response.
-    b : float
-        The non-linear scaling of the constitutive.
-
-    Attributes
-    ----------
-    a : float
-        The linear scaling of the stiffness response.
-    b : float
-        The non-linear scaling of the constitutive.
-    """
-    def __init__(self, a, b):
-        r"""
-        This simple non-linear constitutive equation contains two constants, `a` and `b`.
-        """
-        super().__init__()
-        self.a = a
-        self.b = b
-
-    def moment(self, uxx):
-        r"""
-        Converts curvature into moment.
-
-        .. math::
-            M = b S^{-1}(\frac{\kappa}{a} + \frac{1}{2})
-
-        Parameters
-        ----------
-        uxx : array
-            Second derivative of displacement field.
-
-        Returns
-        -------
-        array
-            Internal moment :math:`M(x)` obtained from the curvature.
-        """
-        moment = self.b * logit(uxx/self.a + 0.5)
-        return moment
-
-    def curvature(self, m):
-        r"""
-        Converts moment into curvature.
-
-        .. math::
-            \kappa = a S(\frac{M}{b} - \frac{1}{2})
-
-        Parameters
-        ----------
-        m : array
-            Internal moment.
-
-        Returns
-        -------
-        array
-            Curvature (second derivative of the displacement) field :math:`\kappa` obtained from the moment.
-        """
-        uxx = self.a * (expit(m/self.b) - 1/2)
-        return uxx
+        u = potential / self.a  # Linear material.
+        return u

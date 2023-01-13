@@ -24,13 +24,3 @@ Actual Constitutive Models
     :members:
     :show-inheritance:
     :inherited-members:
-
-.. autoclass:: constitutive.Softening
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: constitutive.Hardening
-    :members:
-    :show-inheritance:
-    :inherited-members:
