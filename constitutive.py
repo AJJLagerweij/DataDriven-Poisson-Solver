@@ -10,9 +10,11 @@ traditional methods.
 In general the Poisson problem is formulated as:
 
 .. math::
-    \nabla^2 f(u(x)) = g(x)\\
+    \nabla^2 \psi = g(x)\\
 
-    \text{where:}  u(x) = \tilde{u} \quad \forall x\in\Gamma
+    \text{where:} \psi = f(u(x))\\
+
+    \text{where:} u(x) = \tilde{u} \quad \forall x\in\Gamma
 
 Here we define math:`f(u(x))` as the constitutive equation.
 
@@ -56,7 +58,7 @@ class Constitutive(ABC):
         r"""
         The constitutive equation.
 
-        The constitutive equation model converts the field :math:`u` into the potential :math:`f(u)`.
+        The constitutive equation model converts the field :math:`u` into the potential :math:`\psi=f(u)`.
 
         Parameters
         ----------
@@ -66,7 +68,7 @@ class Constitutive(ABC):
         Returns
         -------
         potential
-            The potential related to this field.
+            The potential :math:`\psi` related to this field.
         """
         pass
 
@@ -75,13 +77,13 @@ class Constitutive(ABC):
         r"""
         The inverse constitutive equation.
 
-        The material model converts the field :math:`u` into the potential :math:`f(u)`, this performs the inverse
+        The material model converts the field :math:`u` into the potential :math:`\psi`, this performs the inverse
         operation.
 
         Parameters
         ----------
         potential : array
-            Potential to be converted back into the main field.
+            Potential :math:`\psi` to be converted back into the main field.
 
         Returns
         -------
@@ -113,7 +115,7 @@ class LinearMaterial(Constitutive):
     This linear constitutive equation is traditionally the one used.
 
     .. math::
-            f(u(x)) = a u(x)
+            \psi = a u(x)
 
     Parameters
     ----------
@@ -130,17 +132,17 @@ class LinearMaterial(Constitutive):
         This simple linear constitutive equation depends on the bending stiffness :math:`EI`.
         """
         super().__init__()
-        self.a = a
+        self.a = float(a)
 
     def field_to_potential(self, u):
         r"""
         The constitutive equation.
 
-        The constitutive equation model converts the field :math:`u` into the potential :math:`f(u)`. This is
+        The constitutive equation model converts the field :math:`u` into the potential :math:`\psi`. This is
         represented by the following equation:
 
         .. math::
-            f(u(x)) = a u(x)
+            \psi = a u(x)
 
         Parameters
         ----------
@@ -150,7 +152,7 @@ class LinearMaterial(Constitutive):
         Returns
         -------
         array
-            The potential :math:`f(u(x))`.
+            The potential :math:`\psi`.
         """
         moment = self.a * u
         return moment
@@ -163,12 +165,12 @@ class LinearMaterial(Constitutive):
         operation. This occurs according to the following linear equation:
 
         .. math::
-            u(x) = \frac{1}{a} f(x
+            u(x) = \frac{1}{a} \psi
 
         Parameters
         ----------
         potential : array
-            Potential to be converted back into the main field.
+            Potential :math:`\psi` to be converted back into the main field.
 
         Returns
         -------

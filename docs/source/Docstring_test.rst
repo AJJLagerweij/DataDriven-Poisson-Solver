@@ -21,32 +21,7 @@ Base Test
 Actual Example Tests
 --------------------
 
-.. autoclass:: test.Cantilever
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: test.SimplySupported
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: test.Clamped
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: test.FourPointBending
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: test.ClampedFourPoint
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: test.Example
+.. autoclass:: test.Laplace_Dirichlet_Dirichlet
     :members:
     :show-inheritance:
     :inherited-members:
