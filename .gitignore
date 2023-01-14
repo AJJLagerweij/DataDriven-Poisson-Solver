@@ -1,6 +1,7 @@
 # Personally added ignores
 /docs/build/
 /__pycache__/
+/.idea/
 
 
 # Default ignored files

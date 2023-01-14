@@ -13,6 +13,7 @@ KAUST |br|
 """
 
 # Import external modules.
+from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import sparse
@@ -24,7 +25,7 @@ from helperfunctions import _m
 import copy
 
 
-class Test(object):
+class Test(ABC):
     r"""
     The definition of a beam test setup and the information that will be obtained from it.
 
@@ -64,7 +65,6 @@ class Test(object):
         self.x = np.array([])
         self.u = np.array([])
         self.g = np.array([])
-        self.end = np.array([])
 
     def __eq__(self, other):
         r"""
@@ -87,8 +87,7 @@ class Test(object):
         # If other is also a Patch then they are equal ones the attributes equal.
         all_tests = (np.all(self.x == other.x)
                      and np.all(self.u == other.u)
-                     and np.all(self.g == other.g)
-                     and np.all(self.end == other.end))
+                     and np.all(self.g == other.g))
         return all_tests
 
     def __copy__(self):
@@ -175,34 +174,10 @@ class Test(object):
             x = self.x
 
         # Calculate the curvature of the patch, and interpolate to locations x.
-        u_interpolated = InterpolatedUnivariateSpline(self.x, self.u, k=4)
+        u_interpolated = InterpolatedUnivariateSpline(x, self.u, k=4)
         potential = material.field_to_potential(u_interpolated)
 
         return potential
-
-    def rotate(self):
-        """
-        Creates a rotated version of the test.
-
-        This is an admissible coordinate transformation, which in the case of beam problems can only be 180 degrees.
-        Hence this is hardcoded. The object that is returned is a copy of `self`, hence `self` remains unchanged.
-
-        .. note:: This type of coordinate transformation would be more free and less discrete for problems other then
-            beam problems, in those cases this rotate_patches should be integrated as a coordinate transformation that
-            has to be determined by the rigid body motion and coordinate transformation solver in
-            :py:class:`~configuration.Configuration`, in that case this function should be removed.
-
-        Returns
-        -------
-        Test
-            The rotated copy of the test.
-        """
-        mirrored_patch = self.__deepcopy__()
-        mirrored_patch.u = -mirrored_patch.u[::-1]
-        mirrored_patch.M = mirrored_patch.M[::-1]
-        mirrored_patch.V = -mirrored_patch.V[::-1]
-        mirrored_patch.end = mirrored_patch.end[::-1]
-        return mirrored_patch
 
     def mirror(self):
         """
@@ -221,9 +196,7 @@ class Test(object):
         """
         mirrored_test = self.__deepcopy__()
         mirrored_test.u = mirrored_test.u[::-1]
-        mirrored_test.M = -mirrored_test.M[::-1]
-        mirrored_test.V = mirrored_test.V[::-1]
-        mirrored_test.end = mirrored_test.end[::-1]
+        mirrored_test.g = -mirrored_test.g[::-1]
         return mirrored_test
 
     def plot(self, axis=None):
@@ -357,7 +330,6 @@ class Laplace_Dirichlet_Dirichlet(Test):
         self.x = x
         self.u = u
         self.g = g
-        self.end = end
 
     def plot(self, axis=None):
         r"""
@@ -381,8 +353,8 @@ class Laplace_Dirichlet_Dirichlet(Test):
 
         # Annotate the boundary conditions.
         arrowprops = dict(color='C0')
-        ax_u.annotate(f"$u_0={u[0]}$", (self.x[0], self.u[0]), xytext=(self.x[0], 0), arrowprops=arrowprops)
-        ax_u.annotate(f"$u_L={u[-1]}$", (self.x[-1], self.u[-1]), xytext=(self.x[-1], 0), arrowprops=arrowprops)
+        ax_u.annotate(f"$u_0={u[0]:.2f}$", (self.x[0], self.u[0]), xytext=(self.x[0], 0), arrowprops=arrowprops)
+        ax_u.annotate(f"$u_L={u[-1]:.2f}$", (self.x[-1], self.u[-1]), xytext=(self.x[-1], 0), arrowprops=arrowprops)
         return ax_u, ax_g
 
 

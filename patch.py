@@ -1,15 +1,14 @@
 r"""
 The patch data-format, specification and creation of patches.
 
-The database will contain all patches, where every patch contains at least a local coordinate system, a displacement
-field and external loading fields. Essentially a patch is a region of a test, hence it will be based upon the general
-:py:class:`~test.Test` object. Because the data-driven nature it will not contain internal loading. Here the
-type 'patch' will be defined to ensure that this is implemented consistently.
+The database will contain all patches, where every patch contains at least a local coordinate system, the primal
+field and right hand side loading. Essentially a patch is a region of a test, hence it will be based upon the general
+:py:class:`~test.Test` object. Here the type 'patch' will be defined to ensure that this is implemented consistently.
 
-Bram Lagerweij |br|
+Bram van der Heijden |br|
 Mechanics of Composites for Energy and Mobility |br|
 KAUST |br|
-2021
+2023
 """
 
 # Import external packages
@@ -25,7 +24,7 @@ class PatchDatabase(object):
     r"""
     The PatchDatabase object contains all patches.
 
-    A patch is the region of a test which was performed. As a result it can only include information that can be
+    A patch is the region of a test, which was performed. As a result it can only include information that can be
     obtained from classical test setups. That is the geometry, deformation and external loading. These properties are
     know at discrete coordinates, as a point cloud. For simplicity the material is assumed to be uniform, hence it is
     not an attribute of the patch.
@@ -118,35 +117,6 @@ class PatchDatabase(object):
         """
         self.database.append(patch)
 
-    def rotate(self):
-        r"""
-        Adds a rotated version of all patches to the database.
-
-        Rotating patches is an admissible coordinate transformation, in beam problems the only rotation available
-        rotates the patch by exactly 180 degrees. This function will copy the patches in the database, rotate them and
-        append them to the end of the database.
-
-        .. note:: This type of coordinate transformation would be more free and less discrete for problems other then
-            beam problems, in those cases this rotate_patches should be integrated as a coordinate transformation that
-            has to be determined by the rigid body motion and coordinate transformation solver in
-            :py:class:`~configuration.Configuration`, in that case this function should be removed.
-
-        .. warning:: Only rotate the database once, rotating multiple time will create many duplicate patches, this will
-            increase the computational complexity and memory used by the solver and will not result in different or more
-            accurate solutions. Only add this rotation after adding all patches to the database.
-
-        Returns
-        -------
-        PatchDatabase
-            The instance itself is returned.
-        """
-        # Create the rotated versions.
-        rotated_database = [patch.rotate() for patch in self.database]
-
-        # Append this rotated database to this database.
-        self.database += rotated_database
-        return self
-
     def mirror(self):
         r"""
         Adds a mirrored version of all patches to the database.
@@ -179,8 +149,6 @@ class PatchDatabase(object):
 
         Parameters
         ----------
-        material : Constitutive
-            The material's constitutive equation is required to plot the moment and shear curves.
         num : int, optional
             The number of patches that you want to plot, by default it plots all patches.
         """
@@ -196,21 +164,17 @@ class PatchDatabase(object):
 
         u_max = 0
         u_min = 0
-        M_max = 0
-        M_min = 0
-        V_max = 0
-        V_min = 0
+        g_min = 0
+        g_max = 0
         for p in range(num):
             patch = self.database[p]
-            patch.plot([axis[0, p], axis[1, p]], annotate=False)
+            patch.plot([axis[0, p], axis[1, p]])
 
             # set max.
             u_max = max(patch.u.max(), u_max)
             u_min = min(patch.u.min(), u_min)
-            M_max = max(patch.M_int.max(), M_max)
-            M_min = min(patch.M_int.min(), M_min)
-            V_max = max(patch.V_int.max(), V_max)
-            V_min = min(patch.V_int.min(), V_min)
+            g_max = max(patch.g.max(), g_max)
+            g_min = min(patch.g.min(), g_min)
 
         # Remove all double objects, such as axis ticks and labels.
         for j in range(num):
@@ -233,11 +197,7 @@ class PatchDatabase(object):
             axis[0, j].set_title(f'Patch {j}')
 
             # Set the limits according to the M_min and M_max.
-            axis[1, j].set_ylim(1.05*M_min, 1.05*M_max)
-
-            # Set the limits according to the V_min and V_max.
-            twin = axis[1, j].get_shared_x_axes().get_siblings(axis[1, j])[0]
-            twin.set_ylim(1.05*V_min, 1.05*V_max)
+            axis[1, j].set_ylim(1.05*g_min, 1.05*g_max)
 
             # For all axis that are not the left column, remove the y-label.
             if j > 0:
@@ -247,13 +207,6 @@ class PatchDatabase(object):
                 axis[1, j].set_yticks([])
                 axis[1, j].set_ylabel('')
                 axis[1, j].spines['left'].set_color('k')
-                twin.spines['left'].set_color('k')
-
-            if j < num - 1:
-                # For all the axis that are on the bottom row and not the right column, remove the y-label
-                # and all the ticks.
-                twin.set_yticks([])
-                twin.set_ylabel('')
 
 
 class Patch(Test):
@@ -261,12 +214,9 @@ class Patch(Test):
     The definition of a patch for a beam problem.
 
     A patch is the region of a test which was performed. As a result it can only include information that can be
-    obtained from classical test setups. That is the geometry, deformation and external loading. These properties are
-    know at discrete coordinates, as a point cloud. For simplicity the material is assumed to be uniform, hence it is
-    not an attribute of the patch.
-
-    .. note:: The `moment()` and `shear()` functions are not Data-Driven as they require the specification of an
-        constitutive equation, which is called EI here.
+    obtained from classical test setups. That is the geometry, primal and right hand side external loading. These
+    properties are know at discrete coordinates, as a point cloud. For simplicity the material is assumed to be
+    uniform, hence it is not an attribute of the patch.
 
     Parameters
     ----------
@@ -282,14 +232,9 @@ class Patch(Test):
     x : array
         Local coordinates.
     u : array
-        Displacement at these local coordinates.
-    M : array
-        Externally applied moments at the local coordinates, includes reaction moments.
-    V : array
-        Externally applied shear at the local coordinates, includes reaction forces. The pressure will be includes as
-        lumped shear forces.
-    end : array
-        Whether the coordinate intersects with the end of the beam, if so `True`, `False` Otherwise.
+        Primal field at these local coordinates.
+    g : array
+        Applied right hand side loading :math:`g(x)`.
     """
 
     def __init__(self, test, x_start, x_end):
@@ -305,8 +250,29 @@ class Patch(Test):
         # Extract the patch attributes:
         self.x = test.x[index] - test.x[index][0]
         self.u = test.u[index]
-        self.M = test.M[index]
-        self.M_int = test.M_int[index]
-        self.V = test.V[index]
-        self.V_int = test.V_int[index]
-        self.end = test.end[index]
+        self.g = test.g[index]
+
+
+if __name__ == '__main__':
+    # Import is required.
+    from test import Laplace_Dirichlet_Dirichlet
+    from constitutive import LinearMaterial
+
+    # Create problem definition.
+    L = 2*np.pi  # Length of the domain.
+    dx = L/20  # Spatial discretization.
+    a = 0  # Left Dirichlet boundary condition.
+    b = L * np.cos(L)  # Right Dirichlet boundary condition.
+    rhs = lambda x: 2*np.sin(x) + x*np.cos(x)  # Problem right hand side.
+    material = LinearMaterial(1)  # Linear unity material, to create traditional Poisson problem.
+
+    # Formulate the problem.
+    test = Laplace_Dirichlet_Dirichlet(L, dx, a, b, rhs, material)
+
+    # Put this into the database.
+    database = PatchDatabase()
+    database.add_test(test)
+    database.add_patches_from_test(test, np.pi)
+
+    # Plot the database.
+    database.plot()
