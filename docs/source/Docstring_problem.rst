@@ -34,43 +34,7 @@ Derived Classes
 Implemented Problems
 --------------------
 
-.. autoclass:: problem.ExampleLoadControlled
+.. autoclass:: problem.Hat
     :members:
     :show-inheritance:
     :inherited-members:
-
-.. autoclass:: problem.ExampleDisplacementControlled
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: problem.CantileverLoadControlled
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: problem.CantileverDisplacementControlled
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: problem.SimplySupported
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: problem.Clamped
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: problem.FourPointBending
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
-.. autoclass:: problem.ClampedFourPoint
-    :members:
-    :show-inheritance:
-    :inherited-members:
-
