@@ -13,7 +13,8 @@ be of constant magnitude or be linearly changing.
     :py:meth:`~constraint.Constraint.satisfy_value_free_translation` and
     :py:meth:`~constraint.Constraint.global_equilibrium_contribution` are never called for a kinematic constant.
 
-.. warning:: Currently all kinematic constraints must be :py:class:`~constraint.PointConstraint`.
+The boundary conditions are given as a point constraint, and the forcing function can consist both of linear and
+point constraints.
 
 Bram Lagerweij |br|
 Mechanics of Composites for Energy and Mobility |br|
@@ -67,25 +68,6 @@ class Constraint(ABC):
         -------
         Constraint
             A constraint for the region x_start to x_end
-        """
-        pass
-
-    @abstractmethod
-    def energy(self, x, complementary_field):
-        r"""
-        The energy at the constraint boundary depends on the prescribed field and it's complement.
-
-        Parameters
-        ----------
-        x : array
-            The location where the complementary field is known.
-        complementary_field : array
-            The complementary field as an array.
-
-        Returns
-        -------
-        float
-            The energy at the boundary.
         """
         pass
 
@@ -148,45 +130,6 @@ class Constraint(ABC):
         list
             A list with all possible translation ranges for which the field satisfies the constraint. The list is
             empty if the constraint cannot be satisfied.
-        """
-        pass
-
-    @abstractmethod
-    def global_equilibrium_contribution(self):
-        r"""
-        Compute the global contribution of this constraint.
-
-        This function can be used to calculate the global contribution of a constraint according to:
-
-        .. math:: F = \int_\Omega c \,dx  \qquad \text{and} \qquad M = \int_\Omega c \cdot x \,dx
-
-        Where :math:`\Omega` represents the entirety of the space and :math:`c` the value of the constraint.
-
-        Returns
-        -------
-        F : float
-            The contribution to the global force equilibrium.
-        M : float
-            The contribution to the global moment equilibrium.
-        """
-        pass
-
-    @abstractmethod
-    def global_internal_contribution(self, x):
-        r"""
-        Computes the effect of this load on the internal equilibrium.
-
-        Parameters
-        ----------
-        x : array
-            Locations where the internal equilibrium curve is queried.
-
-        Returns
-        -------
-        V : array
-            The direct contribution.
-        Vx : array
-            The contribution multiplied by the distance, this is useful for moments caused by shear.
         """
         pass
 
@@ -274,27 +217,6 @@ class PointConstraint(Constraint):
             return None
         else:
             return PointConstraint(self.x, self.magnitude)
-
-    def energy(self, x, complementary_field):
-        r"""
-        The energy at the constraint boundary depends on the prescribed field and it's complement.
-
-        Parameters
-        ----------
-        x : array
-            The location where the complementary field is known.
-        complementary_field : array
-            The complementary field as an array.
-
-        Returns
-        -------
-        float
-            The energy at the boundary.
-        """
-        # Create a interpolation of the field in question.
-        complementary_field_interpolated = InterpolatedUnivariateSpline(x, complementary_field, k=2)
-        energy = complementary_field_interpolated(self.x) * self.magnitude
-        return energy
 
     def value(self, x, rtol=1e-8, atol=1e-8):
         r"""
@@ -393,59 +315,6 @@ class PointConstraint(Constraint):
 
         return admissible_translations
 
-    def global_equilibrium_contribution(self):
-        r"""
-        Compute the global contribution of this constraint.
-
-        This function can be used to calculate the global contribution of a constraint according to:
-
-        .. math:: V = \int_\Omega c \,dx  \qquad \text{and} \qquad Vx = \int_\Omega c \cdot x \,dx
-
-        Where :math:`\Omega` represents the entirety of the space and :math:`c` the value of the constraint.
-
-        Returns
-        -------
-        V : float
-            The value of the
-        Vx : float
-            The contribution to the global moment equilibrium.
-        """
-        V = self.magnitude
-        Vx = self.magnitude * self.x
-        return V, Vx
-
-    def global_internal_contribution(self, x):
-        r"""
-        Computes the effect of this load on the internal equilibrium.
-
-        This function can be used to calculate the internal contribution of a constraint according to:
-
-        .. math:: V = \int_{0}^{x} c \,d\xi  \qquad \text{and} \qquad Vx = \int_{0}^{x} c \cdot \xi \,d\xi
-
-        Where :math:`\Omega` represents the entirety of the space and :math:`c` the value of the constraint.
-
-        Parameters
-        ----------
-        x : array
-            Locations where the internal equilibrium curve is queried.
-
-        Returns
-        -------
-        V : array
-            The direct contribution.
-        Vx : array
-            The contribution multiplied by the distance, this is useful for moments caused by shear.
-        """
-        # Create empty arrays.
-        V = np.zeros_like(x)
-        Vx = np.zeros_like(x)
-
-        # Add the load contribution
-        where_contribute = np.where(x >= self.x)
-        V[where_contribute] = self.magnitude
-        Vx[where_contribute] = self.magnitude * (x[where_contribute] - self.x)
-        return V, Vx
-
     def plot(self, ax, marker, color, offset=0):
         r"""
         Find the range of translations :math:`x=\xi+t` for which field :math:`f(\xi)` satisfy the constraint.
@@ -462,35 +331,12 @@ class PointConstraint(Constraint):
             The offset from the zero line that defines the bar.
         """
         # Marker style
-        if marker == "Displacement":
+        if marker == "bvp":
             xy = [[self.x, 0], [self.x - offset / 2, -offset], [self.x + offset / 2, -offset]]
             patch = mpatches.Polygon(xy, color=color, closed=True, clip_on=False)
             ax.add_patch(patch)
 
-        if marker == "Slope":
-            xy = [[self.x - offset / 2, offset],
-                  [self.x - offset / 2, -offset],
-                  [self.x + offset / 2, -offset],
-                  [self.x + offset / 2, offset]]
-            patch = mpatches.Polygon(xy, color=color, closed=True, clip_on=False)
-            ax.add_patch(patch)
-
-        elif marker == "Moment":
-            center = (self.x, 0)
-            radius = offset
-            theta1 = -110
-            theta2 = 180
-            rwidth = 0.02
-            ring = mpatches.Wedge(center, radius, theta1, theta2, width=rwidth, color=color, clip_on=False)
-            xcent = center[0] - radius + (rwidth / 2)
-            left = [xcent - offset, center[1]]
-            right = [xcent + offset, center[1]]
-            bottom = [(left[0] + right[0]) / 2., center[1] - 0.05]
-            arrow = plt.Polygon([left, right, bottom, left], color=color, clip_on=False)
-            ax.add_patch(ring)
-            ax.add_patch(arrow)
-
-        elif marker == "Shear":
+        elif marker == "rhs":
             patch = mpatches.FancyArrow(self.x, 0, 0, self.magnitude * offset, width=offset / 4, color=color,
                                         clip_on=False)
             ax.add_patch(patch)
@@ -609,42 +455,6 @@ class LinearConstraint(Constraint):
                 return None
         else:
             return None
-
-    def energy(self, x, complementary_field):
-        r"""
-        The energy at the constraint boundary depends on the prescribed field and it's complement.
-
-        Parameters
-        ----------
-        x : array
-            The location where the complementary field is known.
-        complementary_field : array
-            The complementary field as an array.
-
-        Returns
-        -------
-        float
-            The energy at the boundary.
-        """
-        # Find the range for which x is larger then the start of the domain.
-        if self.incl_start:
-            lower_limit = (self.x_start <= x)
-        else:
-            lower_limit = (self.x_start < x)
-
-        # Find range for which x is smaller then the end of the domain.
-        if self.incl_end:
-            upper_limit = (x <= self.x_end)
-        else:
-            upper_limit = (x < self.x_end)
-
-        # Determine the region of interest.
-        index = np.where(lower_limit & upper_limit)
-        local_energy = complementary_field[index] * self.value(x[index])
-
-        # Integrate using interpolated splines.
-        energy = InterpolatedUnivariateSpline(x[index], local_energy, k=2).integral(self.x_start, self.x_end)
-        return energy
 
     def _value(self, x):
         r"""
@@ -790,63 +600,6 @@ class LinearConstraint(Constraint):
                             admissible_translations.append((t, t))
 
         return admissible_translations
-
-    def global_equilibrium_contribution(self):
-        r"""
-        Compute the global contribution of this constraint.
-
-        This function can be used to calculate the global contribution of a constraint according to:
-
-        .. math:: V = \int_\Omega c \,dx  \qquad \text{and} \qquad Vx = \int_\Omega c \cdot x \,dx
-
-        Where :math:`\Omega` represents the entirety of the space and :math:`c` the value of the constraint.
-
-        Returns
-        -------
-        V : float
-            The integral of the magnitude of the constraint.
-        Vx : float
-            The integral of the magnitude times location of the constraint.
-        """
-        slope = (self.magnitude_end - self.magnitude_start) / (self.x_end - self.x_start)
-        constant = -slope * self.x_start + self.magnitude_start
-
-        # Integrate the magnitude over the constraint domain.
-        F = 1 / 2 * slope * (self.x_end ** 2 - self.x_start ** 2) + \
-            constant * (self.x_end - self.x_start)
-
-        # Integrate the magnitude times coordinate over the constraint domain.
-        M = 1 / 3 * slope * (self.x_end ** 3 - self.x_start ** 3) + \
-            1 / 2 * constant * (self.x_end ** 2 - self.x_start ** 2)
-        return F, M
-
-    def global_internal_contribution(self, x):
-        r"""
-        Computes the effect of this load on the internal equilibrium.
-
-        This function can be used to calculate the internal contribution of a constraint according to:
-
-        .. math:: V = \int_{0}^{x} c(\xi) \,d\xi  \qquad \text{and} \qquad Vx = \int_{0}^{x} c(\xi) \cdot \xi \,d\xi
-
-        Where :math:`\Omega` represents the entirety of the space and :math:`c` the value of the constraint.
-
-        Parameters
-        ----------
-        x : array
-            Locations where the internal equilibrium curve is queried.
-
-        Returns
-        -------
-        V : array
-            The direct contribution.
-        Vx : array
-            The contribution multiplied by the distance, this is useful for moments caused by shear.
-        """
-        # Get the magnitude of the constraint at all coordinates x, zero outside domain.
-        magnitude = np.nan_to_num(self.value(x))
-        V = np.cumsum(magnitude)
-        Vx = np.cumsum(magnitude * x)
-        return V, Vx
 
     def plot(self, ax, marker, color, offset=0):
         r"""

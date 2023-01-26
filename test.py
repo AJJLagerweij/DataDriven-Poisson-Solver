@@ -44,16 +44,7 @@ class Test(ABC):
         Local coordinates.
     u : array
         Displacement at these local coordinates.
-    M : array
-        Externally applied moments at the local coordinates, includes reaction moments.
-    M_int : array
-        Internal moments, extracted from reaction forces and loading conditions.
-    V : array
-        Externally applied shear at the local coordinates, includes reaction forces. The pressure will be includes as
-        lumped shear forces.
-    V_int : array
-        Internal shear forces, extracted from reaction forces and loading conditions.
-    end : array
+
         Whether the coordinate intersects with the end of the beam, if so `True`, `False` Otherwise.
     """
 
@@ -64,7 +55,7 @@ class Test(ABC):
         """
         self.x = np.array([])
         self.u = np.array([])
-        self.g = np.array([])
+        self.rhs = np.array([])
 
     def __eq__(self, other):
         r"""
@@ -87,7 +78,7 @@ class Test(ABC):
         # If other is also a Patch then they are equal ones the attributes equal.
         all_tests = (np.all(self.x == other.x)
                      and np.all(self.u == other.u)
-                     and np.all(self.g == other.g))
+                     and np.all(self.rhs == other.rhs))
         return all_tests
 
     def __copy__(self):
@@ -214,7 +205,7 @@ class Test(ABC):
         ax_u : matplotlib.Axis
             The plot axis regarding the field :math:`u`.
         ax_g : matplotlib.Axis
-            The axis of the applied inhomogeneity function :math:`g(x)`.
+            The axis of the applied inhomogeneity function :math:`rhs(x)`.
         """
         if isinstance(axis, list):
             ax_u = axis[0]
@@ -228,7 +219,7 @@ class Test(ABC):
         # Plot the fields.
         lines = []
         lines += ax_u.plot(self.x, self.u, c='C0', label="$u(x)$", )
-        lines += ax_g.plot(self.x, self.g, c='C3', label="Applied rhs $g(x)$")
+        lines += ax_g.plot(self.x, self.rhs, c='C3', label="Applied rhs $rhs(x)$")
 
         # Annotate the loading conditions.
         magnitude = 0.25 * (np.max(self.u) - np.min(self.u))
@@ -239,7 +230,7 @@ class Test(ABC):
 
         # Add the labels to axis.
         ax_u.set_ylabel(_m(r"Field $u$"))
-        ax_g.set_ylabel(_m(r"Right hand side $g$"))
+        ax_g.set_ylabel(_m(r"Right hand side $rhs$"))
         ax_g.set_xlabel(_m(r"Location $x$"))
 
         # Create Legend.
@@ -253,13 +244,11 @@ class Laplace_Dirichlet_Dirichlet(Test):
     A Laplace problem with purly Dirichlet boundary conditions.
 
     .. math::
-        \nabla^2 \psi(x) = g(x) \qquad \text{for} \qquad 0 \leq x \leq L\\
+        \nabla^2 \psi(x) = rhs(x) \qquad \text{for} \qquad 0 \leq x \leq L\\
 
         \psi(x) = f(u(x)) \\
 
-        u(0) = u_0 \\
-
-        u(L) = u_L
+        u(0) = u_0  \qquad \for x=0 and x=L
 
 
     Approximation is made with finite differences, `dx` should be small for accurate results.
@@ -275,7 +264,7 @@ class Laplace_Dirichlet_Dirichlet(Test):
     u_end : float
         Magnitude of the field at the right Dirichlet boundary condition :math:`u_L`.
     rhs : callable
-        The right-hand side function of the problem :math:`g(x)`.
+        The right-hand side function of the problem :math:`rhs(x)`.
     material : Constitutive
         A constitutive equations specifies the material.
     """
@@ -329,7 +318,7 @@ class Laplace_Dirichlet_Dirichlet(Test):
         # Collect the attributes.
         self.x = x
         self.u = u
-        self.g = g
+        self.rhs = g
 
     def plot(self, axis=None):
         r"""
@@ -346,15 +335,15 @@ class Laplace_Dirichlet_Dirichlet(Test):
         ax_u : matplotlib.Axis
             The plot axis regarding the field :math:`u`.
         ax_g : matplotlib.Axis
-            The axis of the applied inhomogeneity function :math:`g(x)`.
+            The axis of the applied inhomogeneity function :math:`rhs(x)`.
         """
         # Create plot through parent.
         ax_u, ax_g = super().plot(axis)
 
         # Annotate the boundary conditions.
         arrowprops = dict(color='C0')
-        ax_u.annotate(f"$u_0={u[0]:.2f}$", (self.x[0], self.u[0]), xytext=(self.x[0], 0), arrowprops=arrowprops)
-        ax_u.annotate(f"$u_L={u[-1]:.2f}$", (self.x[-1], self.u[-1]), xytext=(self.x[-1], 0), arrowprops=arrowprops)
+        ax_u.annotate(f"$u_0={self.u[0]:.2f}$", (self.x[0], self.u[0]), xytext=(self.x[0], 0), arrowprops=arrowprops)
+        ax_u.annotate(f"$u_L={self.u[-1]:.2f}$", (self.x[-1], self.u[-1]), xytext=(self.x[-1], 0), arrowprops=arrowprops)
         return ax_u, ax_g
 
 
@@ -375,6 +364,32 @@ if __name__ == '__main__':
     ax_u, ax_g = test.plot()
 
     # Add exact solution as reference.
-    x = np.linspace(0, L, 201)
-    u = x * np.cos(x)
-    ax_u.plot(x, u, "C2", label="Exact")
+    u_exact = test.x * np.cos(test.x)
+    ax_u.plot(test.x, u_exact, "C2", label="Exact")
+
+    # Create the actual problem that we want to solve.
+    L = 1.  # Length of the domain.
+    h = 0.1  # Length of the loaded section.
+    f = 1.  # Load.
+    dx = L / 100  # Spatial discretization.
+    a = 0  # Left Dirichlet boundary condition.
+    b = 0  # Right Dirichlet boundary condition.
+    material = LinearMaterial(1)  # Linear unity material, to create traditional Poisson problem.
+
+    def rhs(x):
+        # Initialize f(x) to be zero.
+        gx = np.zeros_like(x)
+
+        # Find where the load is applied.
+        index = np.where(((L-h)/2 <= x) & (x <= (L+h)/2))
+
+        # Set the value to the load at these values.
+        gx[index] = f
+
+        return gx
+
+    # Formulate the problem.
+    test = Laplace_Dirichlet_Dirichlet(L, dx, a, b, rhs, material)
+    ax_u, ax_g = test.plot()
+
+

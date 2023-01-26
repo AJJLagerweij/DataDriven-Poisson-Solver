@@ -10,7 +10,7 @@ traditional methods.
 In general the Poisson problem is formulated as:
 
 .. math::
-    \nabla^2 \psi = g(x)\\
+    \nabla^2 \psi = rhs(x)\\
 
     \text{where:} \psi = f(u(x))\\
 
