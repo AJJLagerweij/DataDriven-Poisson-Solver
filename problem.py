@@ -90,13 +90,18 @@ class SubDomain(Domain):
     domain : tuple
         The start (`float`) and end (`float`) of the domain in problem coordinates.
     u_bc : list
-        A list of the different boundaries where the displacement :math:`u` is constraint.
+        A list with the boundary conditions at the start and end of the domain, `len(u_bc)=2`.
+    rhs : list
+        A list with the right-hand side of the differential equation in linear segments.
 
     Attributes
     ----------
     domain : tuple
         The start (`float`) and end (`float`) of the domain in problem coordinates.
     u_bc : list
+        A list with the boundary conditions at the start and end of the domain, `len(u_bc)=2`.
+    rhs : list
+        A list with the right-hand side of the differential equation in linear segments.
     """
 
     def __init__(self, domain, u_bc, rhs):
@@ -136,7 +141,7 @@ class SubDomain(Domain):
         Calculate for what translations :math:`t` the patch can satisfy the right hand side equations.
 
         .. math::
-            g_p(\xi) = rhs(x) \qquad \forall x \in \Omega_d \\
+            g_p(\xi) = g(x) \qquad \forall x \in \Omega_d \\
             \text{where:} \xi = x - t
 
         Parameters
@@ -153,10 +158,47 @@ class SubDomain(Domain):
             A list with a tuple for the max and min translations that satisfy the constraint. This list is empty if the
             patch is too small for the domain.
         """
+        if len(self.rhs) == 0:
+            raise ValueError("The right hand side must be defined on the entire problem and subdomain.")
+
         for constraint in self.rhs:
-            for i, translation in enumerate(translations):
+            i = 0  # Start testing the first constraint range.
+            while i < len(translations):
+                translation = translations[i]  # Get translation range.
                 translation = constraint.satisfy_value_free_translation(patch.x, patch.rhs, translation)
-                translations[i:i+1] = translation  # Remove the previous range and replace it with the newly found ones.
+                translations[i:i + 1] = translation
+                i += len(translation)  # Depending on how many sub-ranges we add we increase the counter.
+        return translations
+
+    def admissible_bc(self, patch, translations):
+        r"""
+        Calculate for what translations :math:`t` the patch can satisfy the Dirichlet boundary conditions.
+
+        .. math::
+            u_p(\xi) = u \qquad \forall x \in \Gamma_d \\
+            \text{where:} \xi = x - t
+
+        Parameters
+        ----------
+        patch : Patch
+            The patch that is considered for the domain
+        translations : list
+            A list with a tuple for the max and min translations that satisfy the constraint. This list is empty if the
+            patch is too small for the domain.
+
+        Returns
+        -------
+        list
+            A list with a tuple for the max and min translations that satisfy the constraint. This list is empty if the
+            patch is too small for the domain.
+        """
+        for constraint in self.u_bc:
+            i = 0  # Start testing the first constraint range.
+            while i < len(translations):
+                translation = translations[i]  # Get translation range.
+                translation = constraint.satisfy_value_free_translation(patch.x, patch.u, translation)
+                translations[i:i + 1] = translation
+                i += len(translation)  # Depending on how many sub-ranges we add we increase the counter.
         return translations
 
     def admissible(self, patch):
@@ -183,6 +225,7 @@ class SubDomain(Domain):
         """
         translations = self.admissible_coordinate_transformations(patch)
         translations = self.admissible_rhs(patch, translations)
+        translations = self.admissible_bc(patch, translations)
         return translations
 
 
@@ -203,8 +246,10 @@ class Problem(Domain, ABC):
         The list with subdomains to the problem.
     num_domains : int
         The number of subdomains in question.
-    continuity : int
-        Specification of the continuity at the start and end of the subdomains.
+    u_bc : list
+        A list with the boundary conditions at the start and end of the domain, `len(u_bc)=2`.
+    rhs : list
+        A list with the right-hand side of the differential equation in linear segments.
     """
     def __init__(self):
         r"""
@@ -305,8 +350,9 @@ class Problem(Domain, ABC):
             for p, patch in enumerate(database.database):
                 translations = domain.admissible(patch)
                 translations_list.append(translations)
+
+                # Patch combination can be considered if at least one admissible translation exists.
                 if len(translations) != 0:
-                    # At least a single translation range is admissible.
                     patch_list.append(p)
 
             # Add the admissible patches for this domain to the admissible_domain_patches list.
@@ -343,37 +389,35 @@ class Problem(Domain, ABC):
 
 class Hat(Problem):
     r"""
-    An example problem representing a statically loaded beam. The tip loaded beam has simple supports at :math:`x=0` and
-    :math:`x=L/4`.
+    A domain with Dirichlet boundaries of zero, and a right hand side of the equation that is zero except for the
+    region of a width h on the middle of the domain.
+
+    .. math::
+        rhs = \begin{cases}
+                0 & 0 \leq x < \frac{L-h}/2 \\
+                1 & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
+                0 & \frac{L-2}/2 < x \leq L
+            \end{cases}
 
     Parameters
     ----------
     length : float
         Total length of the beam.
-    p_tip : float
-        Magnitude of the load applied.
+    h : float
+        Length over which the right hand side is nonzero.
     domain_length : float
         Length of the subdomains.
     num_domains : int
         Number of subdomains.
-    continuity : int, optional
-        The continuity in the overlapping region transitioning from one domain to the other (-1, 0 or a larger integer).
 
     Attributes
     ----------
     domain : tuple
         The start (`float`) and end (`float`) of the domain in problem coordinates.
     u_bc : list
-        A list of the different boundaries where the displacement :math:`u` is constraint.
-    M_bc : list
-        A list with the external moment constraints.
-    V_bc : list
-        A list with the external shear constraints.
-    end : list
-        A list defining the beam ends, at each of these ends the internal static state must at least satisfy the
-        prescribed loads.
-    continuity : int
-        Specification of the continuity at the start and end of the subdomain.
+        A list with the boundary conditions at the start and end of the domain, `len(u_bc)=2`.
+    rhs : list
+        A list with the right-hand side of the differential equation in linear segments.
     """
 
     def __init__(self, length, h, domain_length, num_domains):
@@ -402,8 +446,8 @@ class Hat(Problem):
                      PointConstraint(length, 0)]
 
         self.rhs = [LinearConstraint(0, (length - h)/2, 0, incl_start=True, incl_end=False),
-                     LinearConstraint((length - h)/2, (length + h)/2, 1, incl_start=True, incl_end=True),
-                     LinearConstraint((length + h)/2, length, 0, incl_start=False, incl_end=True)]
+                    LinearConstraint((length - h)/2, (length + h)/2, 1, incl_start=True, incl_end=True),
+                    LinearConstraint((length + h)/2, length, 0, incl_start=False, incl_end=True)]
 
         # Call the parent class to split the problem into subdomains.
         self.split_subdomains(domain_length, num_domains)
@@ -458,7 +502,7 @@ if __name__ == '__main__':
     material = LinearMaterial(1)  # Linear unity material, to create traditional Poisson problem.
 
     # Create the problem.
-    problem = Hat(L, h, 0.6, 2)
+    problem = Hat(L, h, 0.4, 3)
 
     # Plot the problem.
     problem.plot()

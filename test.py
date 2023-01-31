@@ -316,9 +316,9 @@ class Laplace_Dirichlet_Dirichlet(Test):
         end[[0, -1]] = True
 
         # Collect the attributes.
-        self.x = x
-        self.u = u
-        self.rhs = g
+        self.x = x.flatten()
+        self.u = u.flatten()
+        self.rhs = g.flatten()
 
     def plot(self, axis=None):
         r"""

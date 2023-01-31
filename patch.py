@@ -173,8 +173,8 @@ class PatchDatabase(object):
             # set max.
             u_max = max(patch.u.max(), u_max)
             u_min = min(patch.u.min(), u_min)
-            g_max = max(patch.g.max(), g_max)
-            g_min = min(patch.g.min(), g_min)
+            g_max = max(patch.rhs.max(), g_max)
+            g_min = min(patch.rhs.min(), g_min)
 
         # Remove all double objects, such as axis ticks and labels.
         for j in range(num):
@@ -234,7 +234,7 @@ class Patch(Test):
     u : array
         Primal field at these local coordinates.
     g : array
-        Applied right hand side loading :math:`g(x)`.
+        Applied right hand side loading :math:`rhs(x)`.
     """
 
     def __init__(self, test, x_start, x_end):
@@ -250,7 +250,7 @@ class Patch(Test):
         # Extract the patch attributes:
         self.x = test.x[index] - test.x[index][0]
         self.u = test.u[index]
-        self.g = test.g[index]
+        self.rhs = test.rhs[index]
 
 
 if __name__ == '__main__':

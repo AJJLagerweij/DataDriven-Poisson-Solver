@@ -16,95 +16,108 @@ KAUST
 # Importing required modules.
 import matplotlib.pyplot as plt
 import numpy as np
+from functools import partial
 
 # Importing my own scripts.
 from configuration import ConfigurationDatabase
-import problem
-import test
+from problem import Hat
+from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
-from constitutive import Softening, LinearMaterial
+from constitutive import LinearMaterial
 
 # Setup basic plotting properties.
 plt.close('all')
 plt.rcParams['svg.fonttype'] = 'none'
 
+
+# The right-hand side skeleton equation.
+def rhs(x_a, x_b, x):
+    r"""
+    A generic hat function.
+    
+    .. math::
+        g(x) =
+        \begin{cases}
+            0 & 0 \leq x < x_a \\
+            1 & x_a \leq x x_b \\
+            0 & x_b < x \leq L
+        \end{cases}
+    
+    Parameters
+    ----------
+    x : array
+        The location for which the exact solution needs to be found.
+    x_a : float
+        Lower :math:`x` coordinate for which the rhs has a step change from zero up to 1.
+    x_b : float
+        Upper :math:`x` coordinate for which the rhs has a step change from 1 back to 0.
+
+    Returns
+    -------
+    array
+        The right side equation for the requested values of :math:`x`.
+    """
+    gx = np.zeros_like(x)  # Initialize rhs to be zero.
+    index = np.where((x_a <= x) & (x <= x_b))  # Find where the load is applied.
+    gx[index] = 1  # Set the value to the load at these values.
+
+    return gx
+
+
 if __name__ == "__main__":
     # Run settings.
-    parallel = False
+    parallel = True
 
     # Problem definition.
-    problem_length = 1000  # mm
-    problem_load = -1  # kN
-    domain_num = 3  # Number of domains
-    domain_length = 1000./domain_num  # Length of the subdomains in mm.
-    problem = ExampleLoadControlled(problem_length, problem_load, domain_length, domain_num)
-    problem.continuity = -1
+    problem_length = 1.
+    problem_h = 0.25
+    domain_num = 8
+    domain_length = 0.15  # Length of the subdomains
+    problem = Hat(problem_length, problem_h, domain_length, domain_num)
 
     # Locations for the error and error computations and plots.
-    x = np.linspace(0, 1000, 10001)
+    x = np.linspace(0, 1, 1001)
 
     # Material definition.
-    material_var_lin = 7000.0  # Linear material equation constant.
-    material_var_nonlin = 10e-6  # Non-linear material equation constant.
-    material = LinearMaterial(3e4 * material_var_lin)
-    # material = Softening(material_var_lin, material_var_nonlin)
+    material = LinearMaterial(1)
 
     # Create empty database.
     database = PatchDatabase()
 
-    # The test matrix, consider the Simply Supported beam of the following specifications.
-    specimen_length = [1000]  # mm specimen length.
-    specimen_load = [-1]  # kN
+    # Perform test according to the following test matrix.
+    specimen_length = [1]  # specimen length.
+    rhs_list = [partial(rhs, 0.25, 1.00),
+                partial(rhs, 0.00, 0.75),
+                partial(rhs, 0.30, 0.70),
+                partial(rhs, 0.40, 0.60)]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
-    specimen_dx = 1  # mm discretization step size (DIC resolution)
-    for load in specimen_load:
-        for length in specimen_length:
-            test = Example(length, specimen_dx, load, material)
+    specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
+    for length in specimen_length:
+        for rhs in rhs_list:
+            test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
             database.add_test(test)
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
+    database.plot(3)
 
-    # Create a set of all configurations based upon these admissible configurations.
-    configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)
+    # Either create a configurations-database from patch admissibility or from loading previous simulation results.
+    name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()}'
+    # configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
+    configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
-    # Read database.
-    # configurations = ConfigurationDatabase.create_from_load(f'Exact Non-overlapping and TPE {domain_num} domains {database.num_patches()} patches.pkl.gz')
+    # Perform calculations on the database.
+    print(f'{configurations.num_configurations()} are in this database')
+    # configurations.optimize(x, parallel=parallel)
+    # configurations.compare_to_exact(x, material)
+    # configurations.save(f'{name}.pkl.gz')
 
-    # Perform the optimization, and compute errors.
-    configuration = configurations.database.iloc[0, 0]
-    configuration.optimize(x, verbose=True)
-    # configuration.equilibrium(remove=False, parallel=parallel)
-    configuration.compare_to_exact(x, material)
-    # configurations.error_alternative(x, parallel=parallel)
-    configuration.potential_energy(x)
-    # configurations.save(f'Exact Non-overlapping and TPE {domain_num} domains {database.num_patches()} patches.pkl.gz')
+    # Obtain the best configuration.
+    configurations.sort('error')
+    config = configurations.database.iloc[0, 0]
+    config.plot(x, material=material)
 
-    # Plot best error solution.
-    # configurations.sort('error')
-
-    configuration.plot(x, material, title=r"$\min \lambda \Pi^p$ s.t. $\sum (u_a - u_b)^2 + (du_a - du_b)^2=0$")
-
-    # # Plot best energy solution.
-    # configurations.sort('tpe')
-    # configuration = configurations.database.iloc[0, 0]
-    # configuration.plot(x, material, title=r"min $\Pi^p$")
-
-    # # Plot best energy solution.
-    # configurations.sort('error_to_exact')
-    # configuration = configurations.database.iloc[0, 0]
-    # configuration.plot(x, material, title=r"min Error to Exact")
-
-    # # Scatter plots vs tpe.
-    # configurations.database.plot.scatter(x='error_to_exact', y='error', title=r"Old error $\sum \int (u_a-u_b)^2$ vs TPE")
-    # configurations.database.plot.scatter(x='error_to_exact', y='L2M', title=r"$L^2(\Delta u)$ vs TPE")
-    # configurations.database.plot.scatter(x='tpe', y='H1', title=r"$H^1(\Delta u)$ vs TPE")
-    # configurations.database.plot.scatter(x='tpe', y='H2', title=r"$H^2(\Delta u)$ vs TPE")
-
-    plt.show()
-
-    # Scatter plot error vs energy.
-    # configurations.database['e2'] = np.sqrt(configurations.database['error'])/250
-    # data = configurations.database[configurations.database['equilibrium'] is True]
-    # configurations.database.plot.scatter('error', 'tpe')
+    configurations.sort('error_to_exact')
+    config = configurations.database.iloc[0, 0]
+    config.plot(x, material=material)
