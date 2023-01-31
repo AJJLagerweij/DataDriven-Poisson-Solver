@@ -324,15 +324,15 @@ class Configuration(object):
         # Get the reference solution and plot it.
         if material is not None:
             x_exact, u_exact, rhs_exact = self.problem.exact(x, material)
-            ax_u.plot(x_exact, u_exact, color='grey', label=_m(r"$u^{EB}$"))
-            ax_g.plot(x_exact, rhs_exact, color='grey', label=_m(r"$M^{EB}$"))
+            ax_u.plot(x_exact, u_exact, color='grey', label=_m(r"$u^{exact}$"))
+            ax_g.plot(x_exact, rhs_exact, color='grey', label=_m(r"$g(x)^{exact}$"))
 
         # Plot domain primal, moment and bending energy density fields.
         for d, domain in enumerate(self.problem.subdomains):
             # Get domain information.
             index = np.where((domain.domain[0] <= x) & (x <= domain.domain[1]))[0]
             ax_u.plot(x[index], ud[d, index], label=_m(rf"$u_{d}$"))
-            ax_g.plot(x[index], gd[d, index], label=_m(rf"$M_{d}$"))
+            ax_g.plot(x[index], gd[d, index], label=_m(rf"$g_{d}$"))
 
         # Fix axis and add legend.
         ax_u.annotate(result, xy=(0.02, 0.02), xycoords='axes fraction', ha='left', va='bottom')
