@@ -70,9 +70,9 @@ if __name__ == "__main__":
 
     # Problem definition.
     problem_length = 1.
-    problem_h = 0.25
-    domain_num = 8
-    domain_length = 0.15  # Length of the subdomains
+    problem_h = 0.2
+    domain_num = 4
+    domain_length = 0.30  # Length of the subdomains
     problem = Hat(problem_length, problem_h, domain_length, domain_num)
 
     # Locations for the error and error computations and plots.
@@ -86,10 +86,16 @@ if __name__ == "__main__":
 
     # Perform test according to the following test matrix.
     specimen_length = [1]  # specimen length.
-    rhs_list = [partial(rhs, 0.25, 1.00),
-                partial(rhs, 0.00, 0.75),
-                partial(rhs, 0.30, 0.70),
-                partial(rhs, 0.40, 0.60)]  # Potential rhs equations
+    rhs_list = [
+                # partial(rhs, 0.60, 1.00),
+                # partial(rhs, 0.40, 1.00),
+                # partial(rhs, 0.00, 0.40),
+                # partial(rhs, 0.00, 0.60),
+                partial(rhs, 0.30, 0.50),
+                partial(rhs, 0.50, 0.70),
+                partial(rhs, 0.45, 0.55),
+                partial(rhs, 0.35, 0.65)
+                ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
@@ -100,12 +106,12 @@ if __name__ == "__main__":
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
-    database.plot(3)
+    database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()}'
-    # configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
-    configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
+    configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
+    # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
     # Perform calculations on the database.
     print(f'{configurations.num_configurations()} are in this database')
@@ -113,11 +119,11 @@ if __name__ == "__main__":
     # configurations.compare_to_exact(x, material)
     # configurations.save(f'{name}.pkl.gz')
 
-    # Obtain the best configuration.
-    configurations.sort('error')
+    # # Obtain the best configuration.
+    # configurations.sort('error')
     config = configurations.database.iloc[0, 0]
     config.plot(x, material=material)
-
-    configurations.sort('error_to_exact')
-    config = configurations.database.iloc[0, 0]
-    config.plot(x, material=material)
+    #
+    # configurations.sort('error_to_exact')
+    # config = configurations.database.iloc[0, 0]
+    # config.plot(x, material=material)

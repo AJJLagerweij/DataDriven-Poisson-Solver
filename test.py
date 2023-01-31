@@ -218,8 +218,8 @@ class Test(ABC):
 
         # Plot the fields.
         lines = []
-        lines += ax_u.plot(self.x, self.u, c='C0', label="$u(x)$", )
-        lines += ax_g.plot(self.x, self.rhs, c='C3', label="Applied rhs $rhs(x)$")
+        lines += ax_u.plot(self.x, self.u, c='C0', label="Primal Field $u(x)$", )
+        lines += ax_g.plot(self.x, self.rhs, c='C3', label="Right hand side $g(x)$")
 
         # Annotate the loading conditions.
         magnitude = 0.25 * (np.max(self.u) - np.min(self.u))
@@ -229,8 +229,8 @@ class Test(ABC):
         ax_u.set_ylim(np.min(self.u) - magnitude, np.max(self.u) + magnitude)
 
         # Add the labels to axis.
-        ax_u.set_ylabel(_m(r"Field $u$"))
-        ax_g.set_ylabel(_m(r"Right hand side $rhs$"))
+        ax_u.set_ylabel(_m(r"$u(x)$"))
+        ax_g.set_ylabel(_m(r"$g(x)$"))
         ax_g.set_xlabel(_m(r"Location $x$"))
 
         # Create Legend.
