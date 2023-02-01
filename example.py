@@ -1,16 +1,54 @@
 r"""
 The beam example.
 
-The problem solved for is a 1000 mm long simply supported beam. The supports are located as 0 and 250 mm. A load of
-1 N is applied at the end of the beam. It is discretized into 3 domains, each 400 mm long with 100 mm overlap.
+The problem solved is the generic Poisson equation:
 
-The database consists of patches obtained from a several simply supported beams. The patches were harvested are 400mm
-long and had a 100 mm overlap. The exact solution is not in the database.
+.. math::
+    \nabla^2 u = g(x) \quad 0 \leq x \leq 1\\
 
-Bram Lagerweij
+    u(0) = 0\\
+
+    u(1) = 0
+
+In this example the particular problem consists of a hat function.
+
+.. math::
+    g(x) =
+    \begin{cases}
+        0 & 0 \leq x < 0.4
+        1 & 0.4 \leq x \leq 0.6
+        0 & 0.6 < x \leq 1
+    \end{cases}
+
+Our dataset does not contain the solution to this problem. However, it contains the solution for a similar particular
+solution. With Frankenstein's algorithm, we cut the solution in the database in parts and reassemble it such that it
+solves for the particular problem, that is a patch that satisfies :math:`\nabla^2 u_{p_d}(x) = g(x) \qquad \forall
+x\in\Omega_d` only within that subdomain. This however does not solve the problem entirely, as the homogeneous
+solution is still to be found. We know that a homogeneous solution of Poisson problems can be found in the following
+functional space:
+
+.. math::
+    h_d(x) = a_d x + b_d
+
+where :math:`a_d` and :math:`b_d` are unknown constants.
+
+Now the solution space of each subdomain can be written as:
+
+.. math::
+    u_d(x) = u_{p_d}(x) + a_d x + b_d
+
+Where a boundary conditions constrain certain :math:`a_d` and `b_d` variables.
+
+Now the full solution con be found by finding the other variables through a minimization of the overlapping domain
+decomposition cost function.
+
+.. math::
+    u^{exact} = \text{argmin}_{a_d, b_d} \sum_{a=1}^D \sum_{b>a}^D \int_{\Omega_a\cap\Omega_b} \| u_a - u_b \|^2 dx
+
+Bram van der Heijden
 Mechanics of Composites for Energy and Mobility
 KAUST
-2021
+2023
 """
 
 # Importing required modules.
@@ -68,7 +106,7 @@ if __name__ == "__main__":
     specimen_length = [1]  # specimen length.
     rhs_list = [
                 # partial(rhs_hats, [(0.4, 0.6, 1.0)]),  # Exact solution
-                partial(rhs_hats, [(0.29, 0.49,  1.0), (0.51, 0.71, 0.0)]),  # Test that contains the particular parts.
+                partial(rhs_hats, [(0.30, 0.50,  1.0), (0.7, 1.0, -1.0)]),  # Test that contains the particular parts.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
@@ -89,17 +127,10 @@ if __name__ == "__main__":
 
     # Perform calculations on the database.
     print(f'Number of configurations {configurations.num_configurations()}')
-    configurations.optimize(x, parallel=parallel)
-    configurations.compare_to_exact(x, material, parallel=parallel)
-    # configurations.save(f'{name}.pkl.gz')
 
-    # Obtain the best configuration.
-    configurations.sort('error')
+    # There is only a single configruation, hence we just optimize that one.
     config = configurations.database.iloc[0, 0]
     config.plot(x, material=material)
-
-    # configurations.sort('error_to_exact')
-    # config = configurations.database.iloc[0, 0]
-    # config.plot(x, material=material)
-
+    config.optimize(x)
+    config.plot(x, material=material)
     plt.show()
