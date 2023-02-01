@@ -14,6 +14,7 @@ KAUST
 """
 
 # Importing required modules.
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from functools import partial
@@ -28,51 +29,30 @@ from constitutive import LinearMaterial
 # Setup basic plotting properties.
 plt.close('all')
 plt.rcParams['svg.fonttype'] = 'none'
+plt.rcParams['backend'] = 'Qt5agg'
 
 
 # The right-hand side skeleton equation.
-def rhs(x_a, x_b, x):
-    r"""
-    A generic hat function used for the right hand side of the pde. This equation is :math:`L^2(\Omega)$`.
-    
-    .. math::
-        g(x) =
-        \begin{cases}
-            0 & 0 \leq x < x_a \\
-            1 & x_a \leq x x_b \\
-            0 & x_b < x \leq L
-        \end{cases}
-    
-    Parameters
-    ----------
-    x : array
-        The location for which the exact solution needs to be found.
-    x_a : float
-        Lower :math:`x` coordinate for which the rhs has a step change from zero up to 1.
-    x_b : float
-        Upper :math:`x` coordinate for which the rhs has a step change from 1 back to 0.
+def rhs_hats(hats, x):
+    gx = np.zeros_like(x)  # Initialize rhs values
 
-    Returns
-    -------
-    array
-        The right side equation for the requested values of :math:`x`.
-    """
-    gx = np.zeros_like(x)  # Initialize rhs to be zero.
-    index = np.where((x_a <= x) & (x <= x_b))  # Find where the load is applied.
-    gx[index] = 1  # Set the value to the load at these values.
-
+    # For each hat in hats we set the appropriate values.
+    for hat in hats:
+        a, b, value = hat
+        index = (a <= x) & (x <= b)
+        gx[index] = value
     return gx
 
 
 if __name__ == "__main__":
     # Run settings.
-    parallel = True
+    parallel = False
 
     # Problem definition.
     problem_length = 1.
     problem_h = 0.2
     domain_num = 4
-    domain_length = 0.30  # Length of the subdomains
+    domain_length = 0.2875  # Length of the subdomains
     problem = Hat(problem_length, problem_h, domain_length, domain_num)
 
     # Locations for the error and error computations and plots.
@@ -87,14 +67,8 @@ if __name__ == "__main__":
     # Perform test according to the following test matrix.
     specimen_length = [1]  # specimen length.
     rhs_list = [
-                # partial(rhs, 0.60, 1.00),
-                # partial(rhs, 0.40, 1.00),
-                # partial(rhs, 0.00, 0.40),
-                # partial(rhs, 0.00, 0.60),
-                partial(rhs, 0.30, 0.50),
-                partial(rhs, 0.50, 0.70),
-                partial(rhs, 0.45, 0.55),
-                partial(rhs, 0.35, 0.65)
+                # partial(rhs_hats, [(0.4, 0.6, 1.0)]),  # Exact solution
+                partial(rhs_hats, [(0.29, 0.49,  1.0), (0.51, 0.71, 0.0)]),  # Test that contains the particular parts.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
@@ -103,27 +77,29 @@ if __name__ == "__main__":
         for rhs in rhs_list:
             test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
             database.add_test(test)
+            test.plot()
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
-    database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
-    name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()}'
+    name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()} overlap 0.05'
     configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
     # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
     # Perform calculations on the database.
-    print(f'{configurations.num_configurations()} are in this database')
-    # configurations.optimize(x, parallel=parallel)
-    # configurations.compare_to_exact(x, material)
+    print(f'Number of configurations {configurations.num_configurations()}')
+    configurations.optimize(x, parallel=parallel)
+    configurations.compare_to_exact(x, material, parallel=parallel)
     # configurations.save(f'{name}.pkl.gz')
 
-    # # Obtain the best configuration.
-    # configurations.sort('error')
+    # Obtain the best configuration.
+    configurations.sort('error')
     config = configurations.database.iloc[0, 0]
     config.plot(x, material=material)
-    #
+
     # configurations.sort('error_to_exact')
     # config = configurations.database.iloc[0, 0]
     # config.plot(x, material=material)
+
+    plt.show()
