@@ -63,13 +63,27 @@ class Configuration(object):
         """
         self.problem = problem
         self.patches = patches
+        self._rbd = np.zeros((problem.num_domains, 2))  # Private rigid body motion object.
         self._translation_bounds = np.array(translation_bounds)
         self._translation = np.zeros(problem.num_domains)
         self.translation = np.mean(translation_bounds, axis=1)
+        self.rbd = np.zeros((problem.num_domains, 2))
 
         # Determine what parameters are free.
+        self._free_rbd = np.full_like(self.rbd, True, dtype=bool)
         self._free_translation = np.full_like(self.translation, True, dtype=bool)
         for d, domain in enumerate(self.problem.subdomains):
+            # Find free rigid body motions.
+            if len(domain.u_bc) == 1:
+                # If constraint is at domain end, the fixed rbd is related to domain end. Otherwise it is domain start.
+                if domain.u_bc[0].x == domain.domain[1]:
+                    self._free_rbd[d, 1] = False
+                else:
+                    self._free_rbd[d, 0] = False
+            if len(domain.u_bc) == 2:
+                self._free_rbd[d, 0] = False
+                self._free_rbd[d, 1] = False
+
             # Find free translations.
             if self._translation_bounds[d][0] == self._translation_bounds[d][1]:
                 self._free_translation[d] = False
@@ -79,7 +93,102 @@ class Configuration(object):
         self._translation_bounds.setflags(write=False)
         self._translation.setflags(write=False)
         self.translation.setflags(write=False)
+        self._rbd.setflags(write=False)
+        self.rbd.setflags(write=False)
+        self._free_rbd.setflags(write=False)
         self._free_translation.setflags(write=False)
+
+    @property
+    def rbd(self):
+        rbd = np.copy(self._rbd)
+        rbd.setflags(write=False)
+        return rbd
+
+    @rbd.setter
+    def rbd(self, rbd):
+        """
+        Set the rigid body displacement such that is satisfies the kinematic boundary conditions.
+
+        Not all choices of rigid body displacement variables are admissible, and which ones are depends on the boundary
+        conditions defined by the problem, the patches that are selected and the translation considered. As a result the
+        change in a rdb value has to be validated and corrected such that it will match the boundary conditions.
+
+        Parameters
+        ----------
+        rbd : array
+            The proposed rigid body displacement values.
+        """
+        # Create a writable copy of the rbd magnitudes.
+        rbd_set = self.rbd.copy()
+        rbd_set.setflags(write=True)
+
+        for d, domain in enumerate(self.problem.subdomains):
+            if len(domain.u_bc) == 0:  # No kinematic constraints → No checks just set rbd.
+                rbd_set[d] = rbd[d]
+
+            else:  # A condition exists.
+                # Get the current domain settings
+                patch = self.patches[d]
+                t = self.translation[d]
+                u_no_rbd = InterpolatedUnivariateSpline(patch.x + t, patch.u, k=1)  # Interpolated displacement field.
+                d_start = domain.domain[0]
+                d_end = domain.domain[1]
+                length = d_end - d_start
+
+                if len(domain.u_bc) == 1:  # Only one constraint exists, this fixes a single degree of freedom.
+                    # Get constraint properties.
+                    constraint = domain.u_bc[0]
+
+                    # Get patch properties at the constraints.
+                    u_at_constraint = u_no_rbd(constraint.x)
+
+                    # Assumed that u2 is free, and u1 gets fixed by choosing u2.
+                    if constraint.x != d_end:
+                        u2 = rbd[d, 1]
+                        u1 = (constraint.magnitude - u_at_constraint - u2 * (constraint.x - d_start) / length) * \
+                             length / (constraint.x - d_end)
+
+                    else:  # u2 gets fixed by the constraint and u1 remains free.
+                        u1 = rbd[d, 0]
+                        u2 = constraint.magnitude - u_at_constraint
+
+                    # Set the rbd values.
+                    rbd_set[d] = np.array([u1, u2])
+
+                if len(domain.u_bc) == 2:  # Two constraints exist, both degrees of freedom are fixed.
+                    # Get constraint properties.
+                    constraint1 = domain.u_bc[0]
+                    constraint2 = domain.u_bc[1]
+
+                    # Get patch properties at the constraints.
+                    u_at_constraint1 = u_no_rbd(constraint1.x)
+                    u_at_constraint2 = u_no_rbd(constraint2.x)
+
+                    if constraint1.x == d_start and constraint2.x == d_end:
+                        u1 = constraint1.magnitude - u_at_constraint1
+                        u2 = constraint2.magnitude - u_at_constraint2
+                    else:  # At least a single constraint does not intersect.
+                        if constraint1.x == d_start:
+                            u1 = constraint1.magnitude - u_at_constraint1
+                            u2 = (constraint2.magnitude - u_at_constraint2 - u1 * (constraint2.x - d_end) / length)*\
+                                 length / (constraint2.x - d_start)
+                        elif constraint2.x == d_end:  # End constraint.
+                            u2 = constraint2.magnitude - u_at_constraint2
+                            u1 = (constraint1.magnitude - u_at_constraint1 - u2 * (constraint1.x - d_start) / length)*\
+                                 length / (constraint1.x - d_end)
+                        else:  # No constraints intersect.
+                            raise NotImplementedError("Having two Dirichet constraints while not at boundary is not "
+                                                      "implemented.")
+
+                    # Set the rbd values.
+                    rbd_set[d] = np.array([u1, u2])
+
+                else:
+                    ValueError("There cannot be more than two dirichlet boundary conditions in one domain.")
+
+        # Set the resulting rigid body motions.
+        self._rbd = rbd_set
+        self._rbd.setflags(write=False)
 
     @property
     def translation(self):
@@ -100,6 +209,9 @@ class Configuration(object):
         # Clip the translation values that are beyond the limits.
         self._translation = np.clip(translation, self._translation_bounds[:, 0], self._translation_bounds[:, 1])
         self._translation.setflags(write=False)
+
+        # Correct the rigid body displacement variables accordingly.
+        self.rbd = self.rbd
 
     def domain_primal(self, x):
         r"""
@@ -132,9 +244,13 @@ class Configuration(object):
 
         # Loop over all domains and get the primal field at x in problem coordinates.
         for d, domain in enumerate(self.problem.subdomains):
+            d_start = domain.domain[0]
+            d_end = domain.domain[1]
             index = np.where((domain.domain[0] <= x) & (x <= domain.domain[1]))[0]
             u_d = InterpolatedUnivariateSpline(self.patches[d].x + self.translation[d], self.patches[d].u, k=3)
-            u_domains[d, index] = u_d(x[index])
+            u_domains[d, index] = u_d(x[index]) + \
+                                  self.rbd[d, 0] * (x[index] - d_end) / (d_end - d_start) + \
+                                  self.rbd[d, 1] * (x[index] - d_start) / (d_end - d_start)
         return u_domains
 
     def domain_rhs(self, x):
@@ -215,7 +331,7 @@ class Configuration(object):
 
                         # Verify that the subdomains are actually overlapping, and that there are enough sample points.
                         if index[0].shape[0] > 3:
-                            u_gap = InterpolatedUnivariateSpline(x[index], (ud[a, index] - ud[b, index])**2, k=3)
+                            u_gap = InterpolatedUnivariateSpline(x[index], (ud[a, index] - ud[b, index]) ** 2, k=3)
                             error += u_gap.integral(overlap_start, overlap_end)
 
                         else:
@@ -242,9 +358,14 @@ class Configuration(object):
         float
             Magnitude of the minimization function.
         """
+        # Unpack the rbd parameters.
+        rbd = np.copy(self.rbd)
+        rbd[self._free_rbd] = params[:np.count_nonzero(self._free_rbd)]
+        self.rbd = rbd
+
         # Unpack the translation parameters.
         translation = np.copy(self.translation)
-        translation[self._free_translation] = params
+        translation[self._free_translation] = params[np.count_nonzero(self._free_rbd):]
         self.translation = translation
 
         # Calculate error norm.
@@ -271,10 +392,12 @@ class Configuration(object):
         scipy.optimize.OptimizeResult
             The optimization result represented as a `OptimizeResult` object.
         """
-        # Get and initialize the free parameters, that is the free translations.
-        params_initial = self.translation[self._free_translation]
-        lb = np.array(self._translation_bounds)[self._free_translation, 0]
-        ub = np.array(self._translation_bounds)[self._free_translation, 1]
+        # Get and initialize the free parameters, that is all rbd and the free translations.
+        params_initial = np.hstack((self.rbd[self._free_rbd], self.translation[self._free_translation]))
+        lb = np.hstack((np.array([-np.inf] * np.count_nonzero(self._free_rbd)),
+                        np.array(self._translation_bounds)[self._free_translation, 0]))
+        ub = np.hstack((np.array([np.inf] * np.count_nonzero(self._free_rbd)),
+                        np.array(self._translation_bounds)[self._free_translation, 1]))
         bounds = Bounds(lb, ub)
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
