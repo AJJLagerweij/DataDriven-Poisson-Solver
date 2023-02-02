@@ -58,7 +58,7 @@ import numpy as np
 from functools import partial
 
 # Importing my own scripts.
-from configuration import ConfigurationDatabase
+from configuration import Configuration
 from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
@@ -83,55 +83,39 @@ def rhs_hats(hats, x):
 
 
 if __name__ == "__main__":
-    # Run settings.
-    parallel = False
-
     # Problem definition.
-    problem_length = 1.
-    problem_h = 0.2
-    domain_num = 4
-    domain_length = 0.2875  # Length of the subdomains
-    problem = Hat(problem_length, problem_h, domain_length, domain_num)
+    problem_length = 1.  # Length of the problem.
+    problem_h = 0.2  # Width of the hat function.
+    problem_a = 0  # Left boundary value.
+    problem_b = -0.05  # Right boundary value.
+    domain_num = 4  # Amount subdomains.
+    domain_length = 0.2875  # Length of the subdomains.
+    problem = Hat(problem_length, problem_h, problem_a, problem_b, domain_length, domain_num)
 
     # Locations for the error and error computations and plots.
     x = np.linspace(0, 1, 1001)
 
-    # Material definition.
+    # Material definition, required for the test, and verification of the exact solution.
     material = LinearMaterial(1)
 
     # Create empty database.
     database = PatchDatabase()
 
     # Perform test according to the following test matrix.
-    specimen_length = [1]  # specimen length.
-    rhs_list = [
-                # partial(rhs_hats, [(0.4, 0.6, 1.0)]),  # Exact solution
-                partial(rhs_hats, [(0.30, 0.50,  1.0), (0.6, 0.9, -1.0)]),  # Test that contains the particular parts.
-                ]  # Potential rhs equations
-
-    # Perform the testing and add the result to the database.
+    specimen_length = 1  # specimen length.
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
-    for length in specimen_length:
-        for rhs in rhs_list:
-            test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
-            database.add_test(test)
-            test.plot()
+    rhs = partial(rhs_hats, [(0.30, 0.50,  1.0), (0.6, 0.95, -1.0)])  # Test contains the particular parts.
+    test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
 
-    # Plot the resulting database, if required one can rotate or mirror here.
+    # Add the test to the database.
+    database.add_test(test)
     database.mirror()
     print("\nNumber of patches", database.num_patches())
+    test.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
-    name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()} overlap 0.05'
-    configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
-    # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
-
-    # Perform calculations on the database.
-    print(f'Number of configurations {configurations.num_configurations()}')
-
-    # There is only a single configruation, hence we just optimize that one.
-    config = configurations.database.iloc[0, 0]
-    config.plot(x, material=material)
-    config.optimize(x)
-    config.plot(x, material=material)
+    configuration = Configuration(problem, database)  # From patch admissibility.
+    configuration.plot(x, material=material)
+    configuration.optimize(x, verbose=True)
+    configuration.plot(x, material=material)
     plt.show()

@@ -42,10 +42,8 @@ class Configuration(object):
     ----------
     problem : Problem
         The problem that prescribes the boundary conditions and the subdomains.
-    patches : tuple
-        All the patch objects that are to be used in each of the subdomains of the problem.
-    translation_bounds : list
-        The freedom in translation for the patch in each domain, for each domain this is a tuple with `(t_min, t_max)`.
+    patch_database : PatchDatabase
+            The patch database.
 
     Attributes
     ----------
@@ -53,25 +51,34 @@ class Configuration(object):
         The problem that prescribes the boundary conditions and the subdomains.
     patches : tuple
         All the patch objects that are to be used in each of the subdomains of the problem.
-    translation : array
-        The coordinate translation for the patch in each domain, needs to stay within given bounds.
     """
 
-    def __init__(self, problem, patches, translation_bounds):
+    def __init__(self, problem, patch_database):
         r"""
         A configuration is created from an admissible patch & domain combination.
         """
+        # For each domain we want to find and admissible patch.
+        admissibility, translations = problem.domain_patch_admissibility(patch_database)
+
+        # Assign these to the domains.
+        try:
+            pd = [patches_in_d[0] for patches_in_d in admissibility]
+        except IndexError:
+            print(f"There is no patch that satisfies the RHS requirements for a domain")
+            for d in range(len(admissibility)):
+                print(f'Domain {d} has {len(admissibility[d])} patches that satisfy RHS requiments.')
+
+        # Initialize the problem.
         self.problem = problem
-        self.patches = patches
+        self._translation = np.array([translations_d[pd[d]][0][1] for d, translations_d in enumerate(translations)])
+        self.patches = tuple(patch_database.database[patch] for patch in pd)
+
+        # Initialize the rigid body motions.
         self._rbd = np.zeros((problem.num_domains, 2))  # Private rigid body motion object.
-        self._translation_bounds = np.array(translation_bounds)
-        self._translation = np.zeros(problem.num_domains)
-        self.translation = np.mean(translation_bounds, axis=1)
         self.rbd = np.zeros((problem.num_domains, 2))
 
         # Determine what parameters are free.
         self._free_rbd = np.full_like(self.rbd, True, dtype=bool)
-        self._free_translation = np.full_like(self.translation, True, dtype=bool)
         for d, domain in enumerate(self.problem.subdomains):
             # Find free rigid body motions.
             if len(domain.u_bc) == 1:
@@ -84,19 +91,12 @@ class Configuration(object):
                 self._free_rbd[d, 0] = False
                 self._free_rbd[d, 1] = False
 
-            # Find free translations.
-            if self._translation_bounds[d][0] == self._translation_bounds[d][1]:
-                self._free_translation[d] = False
-
         # Make some attributes semi-immutable to not alter them by accident.
         # From here on a slice can be obtained, but a slice cannot be changed.
-        self._translation_bounds.setflags(write=False)
         self._translation.setflags(write=False)
-        self.translation.setflags(write=False)
         self._rbd.setflags(write=False)
         self.rbd.setflags(write=False)
         self._free_rbd.setflags(write=False)
-        self._free_translation.setflags(write=False)
 
     @property
     def rbd(self):
@@ -129,7 +129,7 @@ class Configuration(object):
             else:  # A condition exists.
                 # Get the current domain settings
                 patch = self.patches[d]
-                t = self.translation[d]
+                t = self._translation[d]
                 u_no_rbd = InterpolatedUnivariateSpline(patch.x + t, patch.u, k=1)  # Interpolated displacement field.
                 d_start = domain.domain[0]
                 d_end = domain.domain[1]
@@ -190,29 +190,6 @@ class Configuration(object):
         self._rbd = rbd_set
         self._rbd.setflags(write=False)
 
-    @property
-    def translation(self):
-        translation = np.copy(self._translation)
-        translation.setflags(write=False)
-        return translation
-
-    @translation.setter
-    def translation(self, translation):
-        """
-        Set the translations, ensure that the bounds are satisfied.
-
-        Parameters
-        ----------
-        translation : array
-            The translation that is to be set.
-        """
-        # Clip the translation values that are beyond the limits.
-        self._translation = np.clip(translation, self._translation_bounds[:, 0], self._translation_bounds[:, 1])
-        self._translation.setflags(write=False)
-
-        # Correct the rigid body displacement variables accordingly.
-        self.rbd = self.rbd
-
     def domain_primal(self, x):
         r"""
         Calculate the primal field :math:`u_d` of the domains.
@@ -247,7 +224,7 @@ class Configuration(object):
             d_start = domain.domain[0]
             d_end = domain.domain[1]
             index = np.where((domain.domain[0] <= x) & (x <= domain.domain[1]))[0]
-            u_d = InterpolatedUnivariateSpline(self.patches[d].x + self.translation[d], self.patches[d].u, k=3)
+            u_d = InterpolatedUnivariateSpline(self.patches[d].x + self._translation[d], self.patches[d].u, k=3)
             u_domains[d, index] = u_d(x[index]) + \
                                   self.rbd[d, 0] * (x[index] - d_end) / (d_end - d_start) + \
                                   self.rbd[d, 1] * (x[index] - d_start) / (d_end - d_start)
@@ -286,7 +263,7 @@ class Configuration(object):
         # Loop over all domains and get the primal field at x in problem coordinates.
         for d, domain in enumerate(self.problem.subdomains):
             index = np.where((domain.domain[0] <= x) & (x <= domain.domain[1]))[0]
-            u_d = InterpolatedUnivariateSpline(self.patches[d].x + self.translation[d], self.patches[d].rhs, k=3)
+            u_d = InterpolatedUnivariateSpline(self.patches[d].x + self._translation[d], self.patches[d].rhs, k=3)
             rhs_domains[d, index] = u_d(x[index])
         return rhs_domains
 
@@ -349,7 +326,7 @@ class Configuration(object):
         Parameters
         ----------
         params : array
-            The input parameters consisting of the translations.
+            The input parameters consisting of the free rigid body motions.
         x : array
             Locations where the objective function has to be evaluated.
 
@@ -360,13 +337,8 @@ class Configuration(object):
         """
         # Unpack the rbd parameters.
         rbd = np.copy(self.rbd)
-        rbd[self._free_rbd] = params[:np.count_nonzero(self._free_rbd)]
+        rbd[self._free_rbd] = params
         self.rbd = rbd
-
-        # Unpack the translation parameters.
-        translation = np.copy(self.translation)
-        translation[self._free_translation] = params[np.count_nonzero(self._free_rbd):]
-        self.translation = translation
 
         # Calculate error norm.
         error = self.error(x)
@@ -374,11 +346,10 @@ class Configuration(object):
 
     def optimize(self, x, verbose=False):
         r"""
-        Find the optimal coordinate translations for each domain.
+        Find the optimal rigid body displacements for each domain.
 
-        A bounded optimization is used, which tries to find the best coordinate transformations such that the error
-        is minimized. However, some translations are fixed (these will not be exposed to the optimization) and all
-        free translations have bounds, these bounds will be satisfied.
+        A bounded optimization is used, which tries to find the best rigid body displacements such that the error
+        is minimized.
 
         Parameters
         ----------
@@ -392,17 +363,12 @@ class Configuration(object):
         scipy.optimize.OptimizeResult
             The optimization result represented as a `OptimizeResult` object.
         """
-        # Get and initialize the free parameters, that is all rbd and the free translations.
-        params_initial = np.hstack((self.rbd[self._free_rbd], self.translation[self._free_translation]))
-        lb = np.hstack((np.array([-np.inf] * np.count_nonzero(self._free_rbd)),
-                        np.array(self._translation_bounds)[self._free_translation, 0]))
-        ub = np.hstack((np.array([np.inf] * np.count_nonzero(self._free_rbd)),
-                        np.array(self._translation_bounds)[self._free_translation, 1]))
-        bounds = Bounds(lb, ub)
+        # Get and initialize the free parameters, that is all free rbd.
+        params_initial = self.rbd[self._free_rbd]
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
         options = {'ftol': 1e-25, 'maxiter': 20000, 'disp': verbose, 'iprint': 2}
-        result = minimize(self._objective_function, params_initial, args=x, bounds=bounds, method='SLSQP',
+        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP',
                           tol=0, jac='3-point', options=options)
 
         # Ten ensure that we set the final state of the configuration to the optimal one.
@@ -447,7 +413,7 @@ class Configuration(object):
         # Get the reference solution and plot it.
         if material is not None:
             x_exact, u_exact, rhs_exact = self.problem.exact(x, material)
-            ax_u.plot(x_exact, u_exact, color='grey', label=_m(r"$u^{exact}$"))
+            ax_u.plot(x_exact, u_exact, linestyle='dotted', color='grey', label=_m(r"$u^{exact}$"))
             ax_g.plot(x_exact, rhs_exact, color='grey', label=_m(r"$g(x)^{exact}$"))
 
         # Plot domain primal, moment and bending energy density fields.
@@ -463,8 +429,8 @@ class Configuration(object):
         ax_g.legend(loc=1, frameon=False)
 
         # Add axis labels.
-        ax_u.set_ylabel(_m(r"Primal field $u$"))
-        ax_g.set_ylabel(_m(r"Right hand side $g$"))
+        ax_u.set_ylabel(_m(r"Primal field $u(x)$"))
+        ax_g.set_ylabel(_m(r"Right hand side $g(x)$"))
         ax_g.set_xlabel(_m(r"Location $x$"))
 
         # Save the plot as image.
@@ -513,302 +479,3 @@ class Configuration(object):
             error += np.sqrt(u_gap_spline.integral(start, end))
 
         return error
-
-
-class ConfigurationDatabase(object):
-    r"""
-    This contains the collection of all configurations that are considered.
-
-    To manage all different configurations this class can be used. It allows for the creation of all configurations and
-    contains function calls that apply on all the configuration objects simultaneously.
-
-    .. note:: Creates an empty database by default, please use the class-methods :py:meth:`create_from_problem_patches`
-        or :py:meth:`create_from_load` to create a filled ConfigurationDatabase.
-
-    Parameters
-    ----------
-    database : DataFrame, optional
-        The DataFrame containing all configurations, `None` by default.
-
-    Attributes
-    ----------
-    database : DataFrame
-        A pandas DataFrame containing all the different configurations.
-    """
-
-    def __init__(self, database=None):
-        r"""
-        The database creates configurations from all admissible patch & domain combinations.
-        """
-        if database is None:
-            self.database = pd.DataFrame()
-        else:
-            self.database = database
-
-    @classmethod
-    def create_from_problem_patches(cls, problem, patch_database):
-        r"""
-        Creating a ConfigurationDatabase from a problem formulation and patch database.
-
-        For each subdomain in the problem the admissible patches in the database will be found and configurations will
-        be created from all possible combinations of admissible patches.
-
-        Parameters
-        ----------
-        problem : Problem
-            The problem formulation that describes the problem in question.
-        patch_database : PatchDatabase
-            The patch database.
-
-        Returns
-        -------
-        ConfigurationDatabase
-            A database with all admissible configurations.
-        """
-
-        # Get the admissible patch - domain combinations and their translation bounds.
-        admissibility, translations = problem.domain_patch_admissibility(patch_database)
-        combinations = list(product(*admissibility))
-
-        database = []
-        for combination in combinations:
-            patches = tuple([patch_database.database[patch] for patch in combination])
-
-            # Loop over all admissible translation ranges of this patch domain configuration.
-            translation_bounds_list = []
-            for domain, patch in enumerate(combination):
-                translation_bounds_list.append(translations[domain][patch])
-
-            # Create list with potential translation bound combinations.
-            translation_bounds_combinations = list(product(*translation_bounds_list))
-            for translation_bounds in translation_bounds_combinations:
-                configuration = Configuration(problem, patches, translation_bounds)
-                database.append([configuration, combination, translation_bounds])
-
-        # Create dataframe.
-        index = ['configuration', 'patch', 'translation bounds']
-        database = pd.DataFrame(database, columns=index)
-        return cls(database=database)
-
-    @classmethod
-    def create_from_load(cls, filename, path=''):
-        """
-        Creating a ConfigurationDatabase from a previously saved simulation.
-
-        .. warning::
-            Loading pickled data received from untrusted sources can be unsafe. See:
-            https://docs.python.org/3/library/pickle.html
-
-        Parameters
-        ----------
-        filename : str
-            The name of the file to be loaded, should include the file extension.
-        path : str, optional
-            Path to the file that is to be loaded, working directory be default.
-
-        Returns
-        -------
-        ConfigurationDatabase
-            Returns a database with all the configurations that were previously stored.
-        """
-        database = pd.read_pickle(path + filename)
-        return cls(database=database)
-
-    def num_configurations(self):
-        r"""
-        The number of configurations in the database.
-
-        Returns
-        -------
-        int
-            The number of configurations.
-        """
-        return len(self.database)
-
-    def optimize(self, x, parallel=False):
-        r"""
-        Apply the optimization function to all configurations considered.
-
-        The optimization method is applied to all configurations and the results, the error and the configuration state,
-        are added as an column in the database.
-
-        .. warning:: Changes the object in place, the database will be extended with a column on the optimization
-            results.
-
-        Parameters
-        ----------
-        x : array
-            Locations where the objective function needs to be analyzed.
-        parallel : bool, optional
-            `True` if the computation should be performed in parallel, `False` if it should be in series.
-
-        See Also
-        --------
-        Configuration.optimize : The function that is called for all configurations.
-        """
-
-        # Create partial optimization function that contains all fixed information.
-        def function(config):
-            """The wrapper around the :py:meth:`Configuration.optimize` function."""
-            result = config.optimize(x)
-            out = pd.Series(
-                [config, result.fun, config.translation, result.success])
-            return out
-
-        # Apply the optimization function to all configurations.
-        if self.num_configurations() == 0:
-            raise ValueError("There are no configurations in this database.")
-        else:
-            print(f"Minimizing the error equation for {self.num_configurations()} configurations.")
-            if parallel:
-                # Check whether parallel run was initialized before.
-                if hasattr(self.database.configuration, 'parallel_apply') is False:
-                    pandarallel.initialize()
-
-                # The parallel run.
-                self.database[['configuration', 'error', 'translation',
-                               'success']] = self.database.configuration.parallel_apply(function)
-            else:
-                print("    Slow computation because execution is in series.")
-                self.database[['configuration', 'error', 'translation',
-                               'success']] = self.database.configuration.apply(function)
-
-    def error(self, x, parallel=False):
-        r"""
-        Apply the error calculation function to all configurations considered and sort based upon it.
-
-        .. warning:: Changes the object in place, a column with the error magnitude will be added to the database.
-
-        Parameters
-        ----------
-        x : array
-            Locations where the objective function needs to be analyzed.
-        parallel : bool, optional
-            `True` if the computation should be performed in parallel, `False` if it should be in series.
-
-        See Also
-        --------
-        Configuration.error : The function that is called for all configurations.
-        """
-
-        # Create partial optimization function that contains all fixed information.
-        def function(config):
-            """The wrapper around the :py:meth:`Configuration.error` function."""
-            error = config.error(x)
-            return error
-
-        # Apply the optimization function to all configurations.
-        if self.num_configurations() == 0:
-            raise ValueError("There are no configurations in this database.")
-        else:
-            print(f"Computing the DD Error for {self.num_configurations()} configurations.")
-            if parallel:
-                # Check whether parallel run was initialized before.
-                if hasattr(self.database.configuration, 'parallel_apply') is False:
-                    pandarallel.initialize()
-
-                # The parallel run.
-                self.database['error'] = self.database.configuration.parallel_apply(function)
-            else:
-                print("    Slow computation because execution is in series.")
-                self.database['error'] = self.database.configuration.apply(function)
-
-    def compare_to_exact(self, x, material, parallel=False):
-        r"""
-        Apply te compare to exact calculation to all configurations in the database.
-
-        Parameters
-        ----------
-        x : array
-            Locations where the objective function needs to be analyzed.
-        material : Constitutive
-            The constitutive equation of the material in question.
-        parallel : bool, optional
-            `True` if the computation should be performed in parallel, `False` if it should be in series.
-
-        See Also
-        --------
-        Configuration.compare_to_exact : The function that is called for all configurations.
-        """
-
-        # Create partial optimization function that contains all fixed information.
-        def function(config):
-            """The wrapper around the :py:meth:`Configuration.potential_energy` function."""
-            error_to_exact = config.compare_to_exact(x, material)
-            return error_to_exact
-
-        # Apply the optimization function to all configurations.
-        if self.num_configurations() == 0:
-            raise ValueError("There are no configurations in this database.")
-        else:
-            print(f"Computing error with respect to reference solution for {self.num_configurations()} configurations.")
-            if parallel:
-                # Check whether parallel run was initialized before.
-                if hasattr(self.database.configuration, 'parallel_apply') is False:
-                    pandarallel.initialize()
-
-                # The parallel run.
-                self.database['error_to_exact'] = self.database.configuration.parallel_apply(function)
-            else:
-                print("    Slow computation because execution is in series.")
-                self.database['error_to_exact'] = self.database.configuration.apply(function)
-
-    def sort(self, key):
-        """
-        Sort the configuration database according to the given column.
-
-        Parameters
-        ----------
-        key : str
-            The column for which the database needs to be sorted.
-        """
-        self.database = self.database.sort_values(key, ascending=True)
-
-    def plot(self, x, material, max_images=5, title=None, path=None):
-        r"""
-        Plot the first 'max_images` configurations, based upon the current order in `self.database`.
-
-        Parameters
-        ----------
-        x : array
-            The locations where the state is sampled.
-        material : Constitutive
-            The constitutive equation for the material considered, if provided it is used to calculate the exat solution
-            using Euler-Bernoulli beam theory.
-        max_images : int, optional
-            The maximum number of configurations that will be plotted, defaults to 5.
-        title : str, optional
-            The title on top of the image, if any is specified.
-        path : str, optional
-            The path to which a .png and a .svg need to be saved, disabled by default.
-
-        See Also
-        --------
-        Configuration.plot : The function that is called for all configurations.
-        """
-        for i, configuration in enumerate(self.database.configuration.head(max_images)):
-            title_i = f'Configuration {self.database.index[i]}'
-            if title is not None:
-                title_i = title + f' {i} ({title_i})'
-            configuration.plot(x, material, title=title_i, path=path)
-        plt.show()
-
-    def save(self, filename, path='', compression="infer"):
-        r"""
-        Saving the DataFrame into a pickle.
-
-        This will store the entirety of the configurations database as a pickle. The benefit is that this allows for the
-        computation of optimal solutions on remote machines, then transfer the data to your machine to analyze the
-        results. The optimization results (the errors, and optimal coordinate translation) are then
-        included and post-processing can be performed without the need for expensive computations.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the pickled file, do include the preferred file extension.
-        path : str, optional
-            The path to where the file should be stored, saves to working directory by default.
-        compression : str, optional
-            Whether and with what format the object should be compressed, `infer` from filename extension by default.
-        """
-        self.database.to_pickle(path + filename, compression=compression)
