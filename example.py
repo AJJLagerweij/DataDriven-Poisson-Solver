@@ -8,7 +8,7 @@ The problem solved is the generic Poisson equation:
 
     u(0) = 0\\
 
-    u(1) = 0
+    u(1) = -0.05
 
 In this example the particular problem consists of a hat function.
 
