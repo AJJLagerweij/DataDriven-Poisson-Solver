@@ -15,10 +15,3 @@ Configuration
 
 .. autoclass:: configuration.Configuration
     :members:
-
-
-Database of Configurations
---------------------------
-
-.. autoclass:: configuration.ConfigurationDatabase
-    :members:

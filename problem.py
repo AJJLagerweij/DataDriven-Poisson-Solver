@@ -389,11 +389,11 @@ class Problem(Domain, ABC):
 
 class Hat(Problem):
     r"""
-    A domain with Dirichlet boundaries of zero, and a right hand side of the equation that is zero except for the
-    region of a width h on the middle of the domain.
+    A domain with Dirichlet boundaries :math:`a`, and :math:`b`, and a right hand side :math:`g(x)` that is zero
+    except for the region of a width h on the middle of the domain.
 
     .. math::
-        rhs = \begin{cases}
+        g(x) = \begin{cases}
                 0 & 0 \leq x < \frac{L-h}/2 \\
                 1 & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
                 0 & \frac{L-2}/2 < x \leq L
@@ -405,6 +405,10 @@ class Hat(Problem):
         Total length of the beam.
     h : float
         Length over which the right hand side is nonzero.
+    a : float
+        Left boundary value, :math:`u(0)=a`.
+    b : float
+        Right boundary value, :math:`u(L)=b`.
     domain_length : float
         Length of the subdomains.
     num_domains : int
@@ -420,7 +424,7 @@ class Hat(Problem):
         A list with the right-hand side of the differential equation in linear segments.
     """
 
-    def __init__(self, length, h, domain_length, num_domains):
+    def __init__(self, length, h, a, b, domain_length, num_domains):
         r"""
         A domain with Dirichlet boundaries of zero, and a right hand side of the equation that is zero except for the
         region of a width h on the middle of the domain.
@@ -437,13 +441,15 @@ class Hat(Problem):
         # Store initialize properties.
         self._length = length
         self._h = h
+        self._a = a
+        self._b = b
 
         # Initialize the domain and subdomains and continuity.
         self.domain = (0, length)
 
         # The kinematic displacement constraints are the two simple supports at x=0 and x=L/4
-        self.u_bc = [PointConstraint(0, 0),
-                     PointConstraint(length, 0)]
+        self.u_bc = [PointConstraint(0, a),
+                     PointConstraint(length, b)]
 
         self.rhs = [LinearConstraint(0, (length - h)/2, 0, incl_start=True, incl_end=False),
                     LinearConstraint((length - h)/2, (length + h)/2, 1, incl_start=True, incl_end=True),
@@ -487,7 +493,7 @@ class Hat(Problem):
 
             return gx
 
-        exact = test.Laplace_Dirichlet_Dirichlet(self._length, x[1] - x[0], 0, 0, rhs, material)
+        exact = test.Laplace_Dirichlet_Dirichlet(self._length, x[1] - x[0], self._a, self._b, rhs, material)
 
         return exact.x, exact.u, exact.rhs
 
