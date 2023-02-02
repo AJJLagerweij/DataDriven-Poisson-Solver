@@ -106,7 +106,7 @@ if __name__ == "__main__":
     specimen_length = [1]  # specimen length.
     rhs_list = [
                 # partial(rhs_hats, [(0.4, 0.6, 1.0)]),  # Exact solution
-                partial(rhs_hats, [(0.30, 0.50,  1.0), (0.7, 1.0, -1.0)]),  # Test that contains the particular parts.
+                partial(rhs_hats, [(0.30, 0.50,  1.0), (0.6, 0.9, -1.0)]),  # Test that contains the particular parts.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
@@ -118,6 +118,7 @@ if __name__ == "__main__":
             test.plot()
 
     # Plot the resulting database, if required one can rotate or mirror here.
+    database.mirror()
     print("\nNumber of patches", database.num_patches())
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
