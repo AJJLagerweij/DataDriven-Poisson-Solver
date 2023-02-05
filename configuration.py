@@ -51,6 +51,9 @@ class Configuration(object):
         The problem that prescribes the boundary conditions and the subdomains.
     patches : tuple
         All the patch objects that are to be used in each of the subdomains of the problem.
+    rbd : array
+        The degree of freedoms of the homogeneous solutions. The linear homogeneous solutions contain two degrees of
+        freedom per domain.
     """
 
     def __init__(self, problem, patch_database):
