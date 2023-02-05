@@ -1,3 +1,4 @@
+# ToDo: Add support for constant additions to the primal. This also relaxes the Dirichlet BC.
 r"""
 The configuration is a proposed solution for the problem.
 
@@ -55,6 +56,10 @@ class Configuration(object):
         All the patch objects that are to be used in each of the subdomains of the problem.
     translation : array
         The coordinate translation for the patch in each domain, needs to stay within given bounds.
+    rbd : array
+        The primal degrees of freedom :math:`\bar{u}_d` are additions to the primal field that will not influence the
+        right hand side. For non-linear Poisson equations this includes a constant addition per domain
+         :math:`u_d = u_{p_p} + \bar{u}_d`,
     """
 
     def __init__(self, problem, patches, translation_bounds):
