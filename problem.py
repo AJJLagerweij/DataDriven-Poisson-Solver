@@ -225,7 +225,7 @@ class SubDomain(Domain):
         """
         translations = self.admissible_coordinate_transformations(patch)
         translations = self.admissible_rhs(patch, translations)
-        translations = self.admissible_bc(patch, translations)
+        # translations = self.admissible_bc(patch, translations)  # Primal freedom satisfies Dirichlet bc.
         return translations
 
 

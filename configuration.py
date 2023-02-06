@@ -68,23 +68,83 @@ class Configuration(object):
         """
         self.problem = problem
         self.patches = patches
-        self._translation_bounds = np.array(translation_bounds)
+
+        # Initialize hidden attributes.
+        self._rbd = np.zeros(self.problem.num_domains)
         self._translation = np.zeros(problem.num_domains)
+
+        # Set the rigid body motions.
+        self.rbd = np.zeros_like(self._rbd)
+
+        # Set the translation and its bounds.
+        self._translation_bounds = np.array(translation_bounds)
         self.translation = np.mean(translation_bounds, axis=1)
 
         # Determine what parameters are free.
+        self._free_rbd = np.full_like(self._rbd, True, dtype=bool)
         self._free_translation = np.full_like(self.translation, True, dtype=bool)
         for d, domain in enumerate(self.problem.subdomains):
+            # Find which primal freedom is free.
+            if len(domain.u_bc) != 0:
+                self._free_rbd[d] = False
+
             # Find free translations.
             if self._translation_bounds[d][0] == self._translation_bounds[d][1]:
                 self._free_translation[d] = False
 
         # Make some attributes semi-immutable to not alter them by accident.
         # From here on a slice can be obtained, but a slice cannot be changed.
+        self._rbd.setflags(write=False)
+        self.rbd.setflags(write=False)
+        self._free_rbd.setflags(write=False)
         self._translation_bounds.setflags(write=False)
         self._translation.setflags(write=False)
         self.translation.setflags(write=False)
         self._free_translation.setflags(write=False)
+
+    @property
+    def rbd(self):
+        rbd = np.copy(self._rbd)
+        rbd.setflags(write=False)
+        return rbd
+
+    @rbd.setter
+    def rbd(self, rbd):
+        """
+        Set the rigid body displacement such that is satisfies the kinematic boundary conditions.
+        Not all choices of rigid body displacement variables are admissible, and which ones are depends on the boundary
+        conditions defined by the problem, the patches that are selected and the translation considered. As a result the
+        change in a rdb value has to be validated and corrected such that it will match the boundary conditions.
+        Parameters
+        ----------
+        rbd : array
+            The proposed rigid body displacement values.
+        """
+        # Create a writable copy of the rbd magnitudes.
+        rbd_set = self.rbd.copy()
+        rbd_set.setflags(write=True)
+
+        for d, domain in enumerate(self.problem.subdomains):
+            if len(domain.u_bc) == 0:  # No kinematic constraints.
+                rbd_set[d] = rbd[d]  # No checks just set rbd.
+
+            elif len(domain.u_bc) == 1:  # With a kinematic constraint.
+                # Get properties.
+                patch = self.patches[d]
+                t = self._translation[d]
+                constraint = domain.u_bc[0]
+                u_no_rbd = InterpolatedUnivariateSpline(patch.x + t, patch.u, k=1)  # Interpolated displacement field.
+
+                # Ensure that the boundary condition is satisfied.
+                u_at_constraint = u_no_rbd(constraint.x)
+                rbd_set[d] = -u_at_constraint
+
+            else:  # There cannot be more than one kinematic constraint.
+                ValueError("There cannot be more than one dirichlet boundary conditions in each domain.")
+
+        # Set the rigid body displacements.
+        self._rbd = rbd_set
+        self._rbd.setflags(write=False)
 
     @property
     def translation(self):
@@ -105,6 +165,9 @@ class Configuration(object):
         # Clip the translation values that are beyond the limits.
         self._translation = np.clip(translation, self._translation_bounds[:, 0], self._translation_bounds[:, 1])
         self._translation.setflags(write=False)
+
+        # Changing the coordinates transformation might affect the rigid body motions.
+        self.rbd = self.rbd
 
     def domain_primal(self, x):
         r"""
@@ -139,7 +202,7 @@ class Configuration(object):
         for d, domain in enumerate(self.problem.subdomains):
             index = np.where((domain.domain[0] <= x) & (x <= domain.domain[1]))[0]
             u_d = InterpolatedUnivariateSpline(self.patches[d].x + self.translation[d], self.patches[d].u, k=3)
-            u_domains[d, index] = u_d(x[index])
+            u_domains[d, index] = u_d(x[index]) + self.rbd[d]  # Add primal freedom.
         return u_domains
 
     def domain_rhs(self, x):
@@ -247,9 +310,14 @@ class Configuration(object):
         float
             Magnitude of the minimization function.
         """
+        # Unpack the rbd freedom.
+        rbd = np.copy(self.rbd)
+        rbd[self._free_rbd] = params[:np.count_nonzero(self._free_rbd)]
+        self.rbd = rbd
+
         # Unpack the translation parameters.
         translation = np.copy(self.translation)
-        translation[self._free_translation] = params
+        translation[self._free_translation] = params[np.count_nonzero(self._free_rbd):]
         self.translation = translation
 
         # Calculate error norm.
@@ -277,9 +345,11 @@ class Configuration(object):
             The optimization result represented as a `OptimizeResult` object.
         """
         # Get and initialize the free parameters, that is the free translations.
-        params_initial = self.translation[self._free_translation]
-        lb = np.array(self._translation_bounds)[self._free_translation, 0]
-        ub = np.array(self._translation_bounds)[self._free_translation, 1]
+        params_initial = np.hstack((self.rbd[self._free_rbd], self.translation[self._free_translation]))
+        lb = np.hstack((np.array([-np.inf] * np.count_nonzero(self._free_rbd)),
+                        np.array(self._translation_bounds)[self._free_translation, 0]))
+        ub = np.hstack((np.array([np.inf] * np.count_nonzero(self._free_rbd)),
+                        np.array(self._translation_bounds)[self._free_translation, 1]))
         bounds = Bounds(lb, ub)
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
