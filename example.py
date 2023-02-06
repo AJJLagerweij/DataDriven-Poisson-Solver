@@ -29,6 +29,7 @@ from constitutive import LinearMaterial, Hardening
 # Setup basic plotting properties.
 plt.close('all')
 plt.rcParams['svg.fonttype'] = 'none'
+plt.rcParams['backend'] = 'Qt5agg'
 
 
 # The right-hand side skeleton equation.
@@ -66,12 +67,15 @@ if __name__ == "__main__":
     # Perform test according to the following test matrix.
     specimen_length = [1]  # specimen length.
     rhs_list = [
-                partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
-                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, mid and large Database.
-                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, mid and large Database.
+                # partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
+                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Small, mid and large database.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
+    x = np.linspace(0, 1, 10001)
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
     for length in specimen_length:
         for rhs in rhs_list:
@@ -93,11 +97,17 @@ if __name__ == "__main__":
     # configurations.compare_to_exact(x, material)
     # configurations.save(f'{name}.pkl.gz')
 
-    # # Obtain the best configuration.
-    # configurations.sort('error')
+    # Get the best configuration in DD-error.
+    configurations.sort('error')
     config = configurations.database.iloc[0, 0]
     config.plot(x, material=material)
-    #
-    # configurations.sort('error_to_exact')
-    # config = configurations.database.iloc[0, 0]
-    # config.plot(x, material=material)
+
+    # Get the best configuration in distance to the exact solution.
+    configurations.sort('error_to_exact')
+    config = configurations.database.iloc[0, 0]
+    config.plot(x, material=material)
+
+    # Compare the two error norms.
+    configurations.sort('error')
+    configurations.database.plot.scatter('error', 'error_to_exact')
+    plt.show()
