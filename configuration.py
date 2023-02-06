@@ -283,8 +283,11 @@ class Configuration(object):
 
                         # Verify that the subdomains are actually overlapping, and that there are enough sample points.
                         if index[0].shape[0] > 3:
-                            u_gap = InterpolatedUnivariateSpline(x[index], (ud[a, index] - ud[b, index])**2, k=3)
-                            error += u_gap.integral(overlap_start, overlap_end)
+                            u_gap = InterpolatedUnivariateSpline(x[index], (ud[a, index] - ud[b, index]), k=3)
+                            du_gap = u_gap.derivative()
+                            local_error = u_gap(x[index])**2 + du_gap(x[index])**2
+                            local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                            error += 0.5 * local_error.integral(overlap_start, overlap_end)
 
                         else:
                             raise ValueError("Insufficient sample points in overlap.")
