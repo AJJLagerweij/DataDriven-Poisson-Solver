@@ -1,4 +1,3 @@
-# TODO: Enable freedom to solve non-linear Poisson problems.
 r"""
 The beam example.
 
@@ -55,9 +54,6 @@ if __name__ == "__main__":
     domain_length = 0.30  # Length of the subdomains
     problem = Hat(problem_length, problem_h, domain_length, domain_num)
 
-    # Locations for the error and error computations and plots.
-    x = np.linspace(0, 1, 1001)
-
     # Material definition.
     material = LinearMaterial(1)
 
@@ -68,10 +64,14 @@ if __name__ == "__main__":
     specimen_length = [1]  # specimen length.
     rhs_list = [
                 # partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
-                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Small, mid and large database.
+                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Mid and large database.
+                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Mid and large database.
+                partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Large database.
+                partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Large database.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
@@ -91,11 +91,14 @@ if __name__ == "__main__":
     configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
     # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
+    # Configurations are evaluated over at the following locations.
+    x = np.linspace(0, 1, 101)
+
     # Perform calculations on the database.
     print(f'{configurations.num_configurations()} are in this database')
-    # configurations.optimize(x, parallel=parallel)
-    # configurations.compare_to_exact(x, material)
-    # configurations.save(f'{name}.pkl.gz')
+    configurations.optimize(x, parallel=parallel)
+    configurations.compare_to_exact(x, material, parallel=parallel)
+    configurations.save(f'{name}.pkl.gz')
 
     # Get the best configuration in DD-error.
     configurations.sort('error')
