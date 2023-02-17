@@ -89,7 +89,7 @@ if __name__ == "__main__":
     problem_a = 0  # Left boundary value.
     problem_b = -0.05  # Right boundary value.
     domain_num = 4  # Amount subdomains.
-    domain_length = 0.2875  # Length of the subdomains.
+    domain_length = 0.27  # Length of the subdomains.
     problem = Hat(problem_length, problem_h, problem_a, problem_b, domain_length, domain_num)
 
     # Locations for the error and error computations and plots.
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     # Perform test according to the following test matrix.
     specimen_length = 1  # specimen length.
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(0.30, 0.50,  1.0), (0.6, 0.95, -1.0)])  # Test contains the particular parts.
+    rhs = partial(rhs_hats, [(0.00, 0.025,  -1.0), (0.05, 0.25, -2.0), (0.50, 0.70,  1.0)])  # Test contains the particular parts.
     test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
 
     # Add the test to the database.

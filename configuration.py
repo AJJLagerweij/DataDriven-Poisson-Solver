@@ -67,9 +67,10 @@ class Configuration(object):
         try:
             pd = [patches_in_d[0] for patches_in_d in admissibility]
         except IndexError:
-            print(f"There is no patch that satisfies the RHS requirements for a domain")
             for d in range(len(admissibility)):
                 print(f'Domain {d} has {len(admissibility[d])} patches that satisfy RHS requiments.')
+
+            raise IndexError("There is no patch that satisfies the RHS requirements for a domain.")
 
         # Initialize the problem.
         self.problem = problem
