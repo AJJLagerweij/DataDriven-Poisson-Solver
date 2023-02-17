@@ -23,7 +23,7 @@ from configuration import ConfigurationDatabase
 from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
-from constitutive import LinearMaterial, Hardening
+from constitutive import LinearMaterial, Softening
 
 # Setup basic plotting properties.
 plt.close('all')
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     problem = Hat(problem_length, problem_h, domain_length, domain_num)
 
     # Material definition.
-    material = LinearMaterial(1)
+    material = Softening(250, 1)
 
     # Create empty database.
     database = PatchDatabase()
@@ -68,10 +68,10 @@ if __name__ == "__main__":
                 partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Small, mid and large database.
                 partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Small, mid and large database.
                 partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Mid and large database.
-                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Mid and large database.
-                partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Large database.
-                partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Large database.
+                # partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Mid and large database.
+                # partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Mid and large database.
+                # partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Large database.
+                # partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Large database.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
@@ -79,12 +79,12 @@ if __name__ == "__main__":
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
     for length in specimen_length:
         for rhs in rhs_list:
-            test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
+            test = Laplace_Dirichlet_Dirichlet(length, specimen_dx, 0, 0, rhs, material)
             database.add_test(test)
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
-    database.plot()
+    # database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()}'

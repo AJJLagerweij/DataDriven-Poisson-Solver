@@ -293,18 +293,14 @@ class Laplace_Dirichlet_Dirichlet(Test):
 
         # Formulate exact problem and boundary conditions and solve it.
         ode = partial(ode_poisson, constitutive=material.potential_to_field, rhs=rhs)
-        bc = partial(bc_dirichlet, a=0, b=0)
+        bc = partial(bc_dirichlet, a=u_start, b=u_end)
         res = solve_bvp(ode, bc, x, u, verbose=0)
 
-        # Sample solution on requested sample points.
-        dof = int(length / dx) + 1
-        x = np.linspace(0, length, dof, dtype=float)
-        u = res.sol(x)[0]
-
         # Collect the attributes.
-        self.x = x.flatten()
-        self.u = u.flatten()
-        self.rhs = rhs(x)
+        dof = int(length / dx) + 1
+        self.x = np.linspace(0, length, dof, dtype=float)
+        self.u = res.sol(self.x)[0]
+        self.rhs = rhs(self.x)
 
     def plot(self, axis=None):
         r"""
