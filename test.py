@@ -16,8 +16,8 @@ KAUST |br|
 from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import sparse
-from scipy.sparse.linalg import spsolve
+from scipy.integrate import solve_bvp
+from functools import partial
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 # Import own modules.
@@ -275,50 +275,36 @@ class Laplace_Dirichlet_Dirichlet(Test):
         """
         super().__init__()
 
-        # Extract information of the discretization.
+        def ode_poisson(x, y, constitutive=lambda y1: y1, rhs=lambda x: 0 * x):
+            """A system of equations for a non-linear Poisson problem."""
+            dy0 = constitutive(y[1])
+            dy1 = -rhs(x)
+            return np.vstack((dy0, dy1))
+
+        def bc_dirichlet(ya, yb, a=0, b=0):
+            """Definition of dirichlet boundary conditions."""
+            res_a = a - ya[0]
+            res_b = b - yb[0]
+            return np.array([res_a, res_b])
+
+        # Create initial mesh and proposed solution.
+        x = np.linspace(0, length, 10)
+        u = np.zeros((2, x.size))
+
+        # Formulate exact problem and boundary conditions and solve it.
+        ode = partial(ode_poisson, constitutive=material.potential_to_field, rhs=rhs)
+        bc = partial(bc_dirichlet, a=0, b=0)
+        res = solve_bvp(ode, bc, x, u, verbose=0)
+
+        # Sample solution on requested sample points.
         dof = int(length / dx) + 1
         x = np.linspace(0, length, dof, dtype=float)
-        dx = x[1] - x[0]
-
-        # Determine RHS of the problem.
-        g = rhs(x)
-        rhs = g.copy()[1:dof-1]
-
-        # Convert the boundary conditions to the potential space.
-        psi_start = material.field_to_potential(u_start)
-        psi_end = material.field_to_potential(u_end)
-
-        # Determine matrix of the system.
-        shape = (dof-2, dof-2)
-        diag = np.array([-1, 2, -1])/(dx**2)
-        k = sparse.diags(diag, [-1, 0, 1], shape=shape, format='lil')
-
-        # Boundary condition \psi(0) = psi_start
-        rhs[0] += psi_start/(dx**2)
-
-        # Boundary condition psi(L) = psi_end.
-        rhs[-1] += psi_end/(dx**2)
-
-        # Convert into csr format.
-        k = k.tocsr()
-
-        # Solve the system k psi = rsh.
-        psi = spsolve(k, rhs)
-
-        # Convert the solution back into the actual field u.
-        u = np.zeros(dof)
-        u[1:dof-1] = material.potential_to_field(psi)
-        u[0] = u_start
-        u[-1] = u_end
-
-        # Define what locations are the end of the beam.
-        end = np.full_like(x, False, dtype=bool)
-        end[[0, -1]] = True
+        u = res.sol(x)[0]
 
         # Collect the attributes.
         self.x = x.flatten()
         self.u = u.flatten()
-        self.rhs = g.flatten()
+        self.rhs = rhs(x)
 
     def plot(self, axis=None):
         r"""
@@ -391,5 +377,4 @@ if __name__ == '__main__':
     # Formulate the problem.
     test = Laplace_Dirichlet_Dirichlet(L, dx, a, b, rhs, material)
     ax_u, ax_g = test.plot()
-
-
+    plt.show()
