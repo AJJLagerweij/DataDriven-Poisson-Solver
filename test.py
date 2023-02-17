@@ -276,7 +276,7 @@ class Laplace_Dirichlet_Dirichlet(Test):
         super().__init__()
 
         def ode_poisson(x, y, constitutive=lambda y1: y1, rhs=lambda x: 0 * x):
-            """A system of equations for a non-linear Poisson problem."""
+            """A system of equations for a (non-)linear Poisson problem."""
             dy0 = constitutive(y[1])
             dy1 = -rhs(x)
             return np.vstack((dy0, dy1))
@@ -293,7 +293,7 @@ class Laplace_Dirichlet_Dirichlet(Test):
 
         # Formulate exact problem and boundary conditions and solve it.
         ode = partial(ode_poisson, constitutive=material.potential_to_field, rhs=rhs)
-        bc = partial(bc_dirichlet, a=0, b=0)
+        bc = partial(bc_dirichlet, a=u_start, b=u_end)
         res = solve_bvp(ode, bc, x, u, verbose=0)
 
         # Sample solution on requested sample points.

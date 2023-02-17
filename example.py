@@ -62,7 +62,7 @@ from configuration import Configuration
 from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
-from constitutive import LinearMaterial, Hardening
+from constitutive import LinearMaterial
 
 # Setup basic plotting properties.
 plt.close('all')
