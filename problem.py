@@ -530,3 +530,4 @@ if __name__ == '__main__':
     # Create Legend.
     labels = [line.get_label() for line in lines]
     ax_u.legend(lines, labels, frameon=False)
+    plt.show()
