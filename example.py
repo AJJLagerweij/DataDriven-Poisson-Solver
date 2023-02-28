@@ -43,7 +43,7 @@ Now the full solution con be found by finding the other variables through a mini
 decomposition cost function.
 
 .. math::
-    u^{exact} = \text{argmin}_{a_d, b_d} \sum_{a=1}^D \sum_{b>a}^D \int_{\Omega_a\cap\Omega_b} \| u_a - u_b \|^2 dx
+    u^{exact} = \text{argmin}_{a_d, b_d} \sum_{i=1}^D \sum_{j>i}^D \int_{\Omega_i\cap\Omega_j} \| u_i - u_j \|^2 dx
 
 Bram van der Heijden
 Mechanics of Composites for Energy and Mobility
@@ -56,6 +56,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from functools import partial
+
+import pandas as pd
 
 # Importing my own scripts.
 from configuration import Configuration
@@ -104,7 +106,7 @@ if __name__ == "__main__":
     # Perform test according to the following test matrix.
     specimen_length = 1  # specimen length.
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(0.00, 0.025,  -1.0), (0.05, 0.25, -2.0), (0.50, 0.70,  1.0)])  # Test contains the particular parts.
+    rhs = partial(rhs_hats, [(0.00, 0.025,  -1.0), (0.05, 0.25, -2.0), (0.70, 0.95,  1.0)])  # Test contains the particular parts.
     test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
 
     # Add the test to the database.
