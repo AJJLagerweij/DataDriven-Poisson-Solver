@@ -26,6 +26,7 @@ from pandarallel import pandarallel
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.optimize import minimize, Bounds, NonlinearConstraint
 from functools import partial
+from os import cpu_count
 
 # Import my own scripts.
 from helperfunctions import _m
@@ -569,6 +570,28 @@ class ConfigurationDatabase(object):
         database = pd.read_pickle(path + filename)
         return cls(database=database)
 
+    def _launch_multiprocessor_pool(self, num=None):
+        """
+        Launches a pandarallel multiprocess pool if it does not exist yet.
+
+        Parameters
+        ----------
+        num : int, optional
+            Number of workers, defaults to 'None', which means that all logical cores will be used.
+        """
+        # Get number of logical cores in system.
+        cores = cpu_count()
+        if num is None:
+            # All threads are allocated.
+            num = cores
+        else:
+            # Using more workers than cores is not allowed.
+            num = min(num, cores)
+
+        # Check whether parallel run was initialized before.
+        if hasattr(self.database.configuration, 'parallel_apply') is False:
+            pandarallel.initialize(nb_workers=num)
+
     def num_configurations(self):
         r"""
         The number of configurations in the database.
@@ -616,9 +639,7 @@ class ConfigurationDatabase(object):
         else:
             print(f"Minimizing the error equation for {self.num_configurations()} configurations.")
             if parallel:
-                # Check whether parallel run was initialized before.
-                if hasattr(self.database.configuration, 'parallel_apply') is False:
-                    pandarallel.initialize()
+                self._launch_multiprocessor_pool()
 
                 # The parallel run.
                 self.database[['configuration', 'error', 'translation',
@@ -658,9 +679,7 @@ class ConfigurationDatabase(object):
         else:
             print(f"Computing the DD Error for {self.num_configurations()} configurations.")
             if parallel:
-                # Check whether parallel run was initialized before.
-                if hasattr(self.database.configuration, 'parallel_apply') is False:
-                    pandarallel.initialize()
+                self._launch_multiprocessor_pool()
 
                 # The parallel run.
                 self.database['error'] = self.database.configuration.parallel_apply(function)
@@ -698,9 +717,7 @@ class ConfigurationDatabase(object):
         else:
             print(f"Computing error with respect to reference solution for {self.num_configurations()} configurations.")
             if parallel:
-                # Check whether parallel run was initialized before.
-                if hasattr(self.database.configuration, 'parallel_apply') is False:
-                    pandarallel.initialize()
+                self._launch_multiprocessor_pool()
 
                 # The parallel run.
                 self.database['error_to_exact'] = self.database.configuration.parallel_apply(function)
