@@ -28,7 +28,7 @@ from constitutive import LinearMaterial, Softening
 # Setup basic plotting properties.
 plt.close('all')
 plt.rcParams['svg.fonttype'] = 'none'
-plt.rcParams['backend'] = 'Qt5agg'
+# plt.rcParams['backend'] = 'Qt5agg'
 
 
 # The right-hand side skeleton equation.
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     problem_length = 1.
     problem_h = 0.2
     domain_num = 4
-    domain_length = 0.30  # Length of the subdomains
+    domain_length = 0.2875  # Length of the subdomains
     problem = Hat(problem_length, problem_h, domain_length, domain_num)
 
     # Material definition.
@@ -64,14 +64,16 @@ if __name__ == "__main__":
     specimen_length = [1]  # specimen length.
     rhs_list = [
                 # partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
-                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Small, mid and large database.
-                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Small, mid and large database.
-                # partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Mid and large database.
-                # partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Mid and large database.
-                # partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Large database.
-                # partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Large database.
+                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Small, mid, large and largest database.
+                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Small, mid, large and largest database.
+                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Small, mid, large and largest database.
+                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Small, mid, large and largest database.
+                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Mid, large and largest database.
+                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Mid, large and largest database.
+                partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Large and largest database.
+                partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Large and largest database.
+                partial(rhs_hats, [(0.00, 0.20, 1.00), (0.00, 0.40, 1.00), (0.80, 1.00, 1.00)]),  # Largest database.
+                partial(rhs_hats, [(0.00, 0.20, 0.50), (0.00, 0.40, 1.00), (0.80, 1.00, 0.50)]),  # Largest database.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
@@ -84,10 +86,10 @@ if __name__ == "__main__":
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
-    # database.plot()
+    database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
-    name = f'Hat-Simulation #d {domain_num} #p {database.num_patches()}'
+    name = f'Hat-Simulation d {domain_num} p {database.num_patches()}'
     configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
     # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
