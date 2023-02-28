@@ -374,9 +374,8 @@ class Configuration(object):
         params_initial = self.rbd[self._free_rbd]
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
-        options = {'ftol': 1e-25, 'maxiter': 20000, 'disp': verbose, 'iprint': 2}
-        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP',
-                          tol=0, jac='3-point', options=options)
+        options = {'ftol': 1e-30, 'disp': verbose, 'iprint': 2}
+        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP', jac='3-point', options=options)
 
         # Ten ensure that we set the final state of the configuration to the optimal one.
         self._objective_function(result.x, x)

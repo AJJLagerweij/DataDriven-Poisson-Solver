@@ -475,10 +475,8 @@ class Hat(Problem):
             The coordinates where the displacement was computed :math:`x`, might differ a bit from the input.
         u : array
             The beam displacement :math:`u(x)`.
-        M : array
-            The internal moment of the exact solution.
-        V : array
-            The internal shear of the exact solution.
+        rhs : array
+            The right hand side :math:`g(x)`.
         """
 
         def rhs(x):
