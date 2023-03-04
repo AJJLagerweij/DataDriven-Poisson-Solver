@@ -138,7 +138,7 @@ class Configuration(object):
 
                 # Ensure that the boundary condition is satisfied.
                 u_at_constraint = u_no_rbd(constraint.x)
-                rbd_set[d] = -u_at_constraint
+                rbd_set[d] = -u_at_constraint + constraint.magnitude
 
             else:  # There cannot be more than one kinematic constraint.
                 ValueError("There cannot be more than one dirichlet boundary conditions in each domain.")

@@ -28,7 +28,7 @@ from constitutive import LinearMaterial, Softening
 # Setup basic plotting properties.
 plt.close('all')
 plt.rcParams['svg.fonttype'] = 'none'
-# plt.rcParams['backend'] = 'Qt5agg'
+plt.rcParams['backend'] = 'Qt5agg'
 
 
 # The right-hand side skeleton equation.
@@ -51,8 +51,12 @@ if __name__ == "__main__":
     problem_length = 1.
     problem_h = 0.2
     domain_num = 4
+    a = 0.
+    b = -0.05
+    # domain_length = 0.525
     domain_length = 0.2875  # Length of the subdomains
-    problem = Hat(problem_length, problem_h, domain_length, domain_num)
+    # domain_length = 0.16875
+    problem = Hat(problem_length, problem_h, a, b, domain_length, domain_num)
 
     # Material definition.
     material = Softening(250, 1)
@@ -64,20 +68,22 @@ if __name__ == "__main__":
     specimen_length = [1]  # specimen length.
     rhs_list = [
                 # partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
-                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Small, mid, large and largest database.
-                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Small, mid, large and largest database.
-                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Small, mid, large and largest database.
-                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Small, mid, large and largest database.
-                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Mid, large and largest database.
-                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Mid, large and largest database.
-                partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Large and largest database.
-                partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Large and largest database.
-                partial(rhs_hats, [(0.00, 0.20, 1.00), (0.00, 0.40, 1.00), (0.80, 1.00, 1.00)]),  # Largest database.
-                partial(rhs_hats, [(0.00, 0.20, 0.50), (0.00, 0.40, 1.00), (0.80, 1.00, 0.50)]),  # Largest database.
+                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, medium, large and largest database.
+                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, medium, large and largest database.
+                # partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Medium, large and largest database.
+                # partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Medium, large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00), (0.80, 1.00, 1.00)]),  # Large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00), (0.80, 1.00, 0.50)]),  # Large and largest database.
+                # partial(rhs_hats, [(0.00, 0.20, 1.00), (0.40, 0.60, 1.00), (0.80, 1.00, 1.00)]),  # Largest database.
+                # partial(rhs_hats, [(0.00, 0.20, 0.50), (0.40, 0.60, 1.00), (0.80, 1.00, 0.50)]),  # Largest database.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
-    x = np.linspace(0, 1, 10001)
+    x = np.linspace(0, 1, 101)
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
     for length in specimen_length:
         for rhs in rhs_list:

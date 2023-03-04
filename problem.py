@@ -389,8 +389,8 @@ class Problem(Domain, ABC):
 
 class Hat(Problem):
     r"""
-    A domain with Dirichlet boundaries of zero, and a right hand side of the equation that is zero except for the
-    region of a width h on the middle of the domain.
+    A domain with Dirichlet boundaries of :math:`u(0)=a` and :math:`u(L)=b', and a right hand side of the equation
+    that is zero except for the region of a width h on the middle of the domain.
 
     .. math::
         rhs = \begin{cases}
@@ -420,10 +420,10 @@ class Hat(Problem):
         A list with the right-hand side of the differential equation in linear segments.
     """
 
-    def __init__(self, length, h, domain_length, num_domains):
+    def __init__(self, length, h, a, b, domain_length, num_domains):
         r"""
-        A domain with Dirichlet boundaries of zero, and a right hand side of the equation that is zero except for the
-        region of a width h on the middle of the domain.
+        A domain with Dirichlet boundaries of :math:`u(0)=a` and :math:`u(L)=b'. Whith a right hand side of the
+        equation that is zero except for the region of a width h on the middle of the domain.
 
         .. math::
             rhs = \begin{cases}
@@ -437,13 +437,15 @@ class Hat(Problem):
         # Store initialize properties.
         self._length = length
         self._h = h
+        self._a = a
+        self._b = b
 
         # Initialize the domain and subdomains and continuity.
         self.domain = (0, length)
 
         # The kinematic displacement constraints are the two simple supports at x=0 and x=L/4
-        self.u_bc = [PointConstraint(0, 0),
-                     PointConstraint(length, 0)]
+        self.u_bc = [PointConstraint(0, a),
+                     PointConstraint(length, b)]
 
         self.rhs = [LinearConstraint(0, (length - h)/2, 0, incl_start=True, incl_end=False),
                     LinearConstraint((length - h)/2, (length + h)/2, 1, incl_start=True, incl_end=True),
@@ -487,7 +489,7 @@ class Hat(Problem):
 
             return gx
 
-        exact = test.Laplace_Dirichlet_Dirichlet(self._length, x[1] - x[0], 0, 0, rhs, material)
+        exact = test.Laplace_Dirichlet_Dirichlet(self._length, x[1] - x[0], self._a, self._b, rhs, material)
 
         return exact.x, exact.u, exact.rhs
 
