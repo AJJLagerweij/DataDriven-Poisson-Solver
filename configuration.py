@@ -351,7 +351,19 @@ class Configuration(object):
         error = self.error(x)
         return error
 
-    def optimize(self, x, verbose=False):
+    def _store_intermediate(self, x, material, params):
+        # Unpack the rbd parameters.
+        rbd = np.copy(self.rbd)
+        rbd[self._free_rbd] = params
+        self.rbd = rbd
+
+        # Calculate error norm, and the distance to the exact solution for each subdomain.
+        error = self.error(x)
+        ed = self.compare_to_exact(x, material)
+        print(error, ed)
+
+
+    def optimize(self, x, verbose=False, material=None):
         r"""
         Find the optimal rigid body displacements for each domain.
 
@@ -364,6 +376,9 @@ class Configuration(object):
             Locations where the objective function needs to be analyzed.
         verbose : bool, optional
             Printing the progress of the optimization at every iteration, `False` by default.
+        material : Constitutive, optional
+            The constitutive equation for the material considered, if provided it is used to calculate the distance
+            between the current solution and the exact solution.
 
         Returns
         -------
@@ -373,9 +388,15 @@ class Configuration(object):
         # Get and initialize the free parameters, that is all free rbd.
         params_initial = self.rbd[self._free_rbd]
 
+        # If material is provided it is used to verify the way that we converge to the exact solution.
+        callback = None  # Default callback.
+        if material is not None:
+            callback = partial(self._store_intermediate(x, material))
+
         # Sequential Least Squares Programming (The best optimization approach for this problem)
         options = {'ftol': 1e-30, 'disp': verbose, 'iprint': 2}
-        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP', jac='3-point', options=options)
+        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP', jac='3-point',
+                          options=options, callback=callback)
 
         # Ten ensure that we set the final state of the configuration to the optimal one.
         self._objective_function(result.x, x)
@@ -470,7 +491,7 @@ class Configuration(object):
         ud = self.domain_primal(x_exact)
 
         # Compare the primal fields:
-        error = 0
+        ed = np.zeros(self.problem.num_domains)
         for d in range(len(self.problem.subdomains)):
             # Find the domain filled with our subdomain d.
             start = self.problem.subdomains[d].domain[0]
@@ -482,6 +503,6 @@ class Configuration(object):
             u_gap_spline = InterpolatedUnivariateSpline(x_exact[index], u_gap, k=3)
 
             # Compute the error.
-            error += np.sqrt(u_gap_spline.integral(start, end))
+            ed[d] = np.sqrt(u_gap_spline.integral(start, end))
 
-        return error
+        return ed
