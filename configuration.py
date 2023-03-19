@@ -414,7 +414,7 @@ class Configuration(object):
         ax_g = axis[1]  # Internal load axis for moment
 
         # Calculate the value of the cost function, and format it in a string for display purposes.
-        result = _m(rf"$\mathcal{{E}}={self.error(x):4.2e}$")
+        result = _m(rf"$\mathcal{{E}}={self.error(x):4.2e}$" + "\n" + rf"$e={self.compare_to_exact(x, material):4.2e}$")
 
         # Get the reference solution and plot it.
         if material is not None:
