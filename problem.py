@@ -496,6 +496,103 @@ class Hat(Problem):
         return exact.x, exact.u, exact.rhs
 
 
+class Homogeneous(Problem):
+    r"""
+    A domain with Dirichlet boundaries of :math:`u(0)=a` and :math:`u(L)=b', and a right hand side of the equation
+    that is zero except for the region of a width h on the middle of the domain.
+
+    .. math::
+        rhs = \begin{cases}
+                0 & 0 \leq x < \frac{L-h}/2 \\
+                1 & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
+                0 & \frac{L-2}/2 < x \leq L
+            \end{cases}
+
+    Parameters
+    ----------
+    length : float
+        Total length of the beam.
+    h : float
+        Length over which the right hand side is nonzero.
+    domain_length : float
+        Length of the subdomains.
+    num_domains : int
+        Number of subdomains.
+
+    Attributes
+    ----------
+    domain : tuple
+        The start (`float`) and end (`float`) of the domain in problem coordinates.
+    u_bc : list
+        A list with the boundary conditions at the start and end of the domain, `len(u_bc)=2`.
+    rhs : list
+        A list with the right-hand side of the differential equation in linear segments.
+    """
+
+    def __init__(self, length, a, b, domain_length, num_domains):
+        r"""
+        A domain with Dirichlet boundaries of :math:`u(0)=a` and :math:`u(L)=b'. Whith a right hand side of the
+        equation that is zero except for the region of a width h on the middle of the domain.
+
+        .. math::
+            rhs = \begin{cases}
+                    0 & 0 \leq x < \frac{L-h}/2 \\
+                    1 & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
+                    0 & \frac{L-2}/2 < x \leq L
+                \end{cases}
+        """
+        super().__init__()
+
+        # Store initialize properties.
+        self._length = length
+        self._a = a
+        self._b = b
+
+        # Initialize the domain and subdomains and continuity.
+        self.domain = (0, length)
+
+        # The kinematic displacement constraints are the two simple supports at x=0 and x=L/4
+        self.u_bc = [PointConstraint(0, a),
+                     PointConstraint(length, b)]
+
+        self.rhs = [LinearConstraint(0, length, 0, incl_start=True, incl_end=True)]
+
+        # Call the parent class to split the problem into subdomains.
+        self.split_subdomains(domain_length, num_domains)
+
+    def exact(self, x, material):
+        r"""
+        The exact solution to this problem.
+
+        Parameters
+        ----------
+        x : array
+            The location for which the exact solution needs to be found.
+        material : Constitutive
+            The constitutive equation of the material considered.
+
+        Returns
+        -------
+        x : array
+            The coordinates where the displacement was computed :math:`x`, might differ a bit from the input.
+        u : array
+            The beam displacement :math:`u(x)`.
+        M : array
+            The internal moment of the exact solution.
+        V : array
+            The internal shear of the exact solution.
+        """
+
+        def rhs(x):
+            # Initialize f(x) to be zero.
+            gx = np.zeros_like(x)
+            return gx
+
+        exact = test.Laplace_Dirichlet_Dirichlet(self._length, x[1] - x[0], self._a, self._b, rhs, material)
+
+        return exact.x, exact.u, exact.rhs
+
+
 if __name__ == '__main__':
     # Import is required.
     from constitutive import LinearMaterial

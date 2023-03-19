@@ -60,8 +60,8 @@ from functools import partial
 import pandas as pd
 
 # Importing my own scripts.
-from configuration import Configuration
-from problem import Hat
+from configuration import ConfigurationDatabase
+from problem import Hat, Homogeneous
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
 from constitutive import LinearMaterial
@@ -86,25 +86,42 @@ def rhs_hats(hats, x):
 
 if __name__ == "__main__":
     # Problem definition.
-    problem_length = 1.  # Length of the problem.
-    problem_h = 0.2  # Width of the hat function.
-    problem_a = 0  # Left boundary value.
-    problem_b = -0.05  # Right boundary value.
-    domain_num = 4  # Amount subdomains.
-    domain_length = 0.27  # Length of the subdomains.
-    problem = Hat(problem_length, problem_h, problem_a, problem_b, domain_length, domain_num)
+    problem_length = 1.
+    problem_h = 0.2
+    domain_num = 4
+    a = 0.
+    b = -0.05
+    # domain_length = 0.525
+    domain_length = 0.2875  # Length of the subdomains
+    # domain_length = 0.16875
+    problem = Hat(problem_length, problem_h, a, b, domain_length, domain_num)
 
-    # Locations for the error and error computations and plots.
-    x = np.linspace(0, 1, 1001)
-
-    # Material definition, required for the test, and verification of the exact solution.
-    material = LinearMaterial(1)
+    # Material definition.
+    material = Softening(250, 1)
 
     # Create empty database.
     database = PatchDatabase()
 
     # Perform test according to the following test matrix.
-    specimen_length = 1  # specimen length.
+    specimen_length = [1]  # specimen length.
+    rhs_list = [
+                # partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
+                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, medium, large and largest database.
+                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, medium, large and largest database.
+                # partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Medium, large and largest database.
+                # partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Medium, large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00), (0.80, 1.00, 1.00)]),  # Large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00), (0.80, 1.00, 0.50)]),  # Large and largest database.
+                # partial(rhs_hats, [(0.00, 0.20, 1.00), (0.40, 0.60, 1.00), (0.80, 1.00, 1.00)]),  # Largest database.
+                # partial(rhs_hats, [(0.00, 0.20, 0.50), (0.40, 0.60, 1.00), (0.80, 1.00, 0.50)]),  # Largest database.
+                ]  # Potential rhs equations
+
+    # Perform the testing and add the result to the database.
+    x = np.linspace(0, 1, 101)
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(0.00, 0.025,  -1.0), (0.05, 0.25, -2.0), (0.70, 0.95,  1.0)])  # Test contains the particular parts.
     test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
@@ -113,11 +130,33 @@ if __name__ == "__main__":
     database.add_test(test)
     database.mirror()
     print("\nNumber of patches", database.num_patches())
-    test.plot()
+    database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
-    configuration = Configuration(problem, database)  # From patch admissibility.
-    configuration.plot(x, material=material)
-    configuration.optimize(x, verbose=True)
-    configuration.plot(x, material=material)
+    name = f'Hat-Simulation d {domain_num} p {database.num_patches()}'
+    configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
+    # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
+
+    # Configurations are evaluated over at the following locations.
+    x = np.linspace(0, 1, 101)
+
+    # Perform calculations on the database.
+    print(f'{configurations.num_configurations()} are in this database')
+    configurations.optimize(x, parallel=parallel)
+    configurations.compare_to_exact(x, material, parallel=parallel)
+    configurations.save(f'{name}.pkl.gz')
+
+    # Get the best configuration in DD-error.
+    configurations.sort('error')
+    config = configurations.database.iloc[0, 0]
+    config.plot(x, material=material)
+
+    # Get the best configuration in distance to the exact solution.
+    configurations.sort('error_to_exact')
+    config = configurations.database.iloc[0, 0]
+    config.plot(x, material=material)
+
+    # Compare the two error norms.
+    configurations.sort('error')
+    configurations.database.plot.scatter('error', 'error_to_exact')
     plt.show()
