@@ -20,7 +20,7 @@ from functools import partial
 
 # Importing my own scripts.
 from configuration import ConfigurationDatabase
-from problem import Hat
+from problem import Hat, Homogeneous
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
 from constitutive import LinearMaterial, Softening
@@ -56,10 +56,10 @@ if __name__ == "__main__":
     # domain_length = 0.525
     domain_length = 0.2875  # Length of the subdomains
     # domain_length = 0.16875
-    problem = Hat(problem_length, problem_h, a, b, domain_length, domain_num)
+    problem = Homogeneous(problem_length, a, b, domain_length, domain_num)
 
     # Material definition.
-    material = Softening(250, 1)
+    material = LinearMaterial(1)
 
     # Create empty database.
     database = PatchDatabase()
@@ -68,10 +68,10 @@ if __name__ == "__main__":
     specimen_length = [1]  # specimen length.
     rhs_list = [
                 # partial(rhs_hats, [(0.40, 0.60, 1.00)]),  # Exactly the problem, and thus also the exact solution.
-                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Smallest, small, medium, large and largest database.
-                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Smallest, small, medium, large and largest database.
-                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
-                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                # partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Smallest, small, medium, large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Smallest, small, medium, large and largest database.
+                # partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                # partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
                 partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, medium, large and largest database.
                 partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, medium, large and largest database.
                 # partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Medium, large and largest database.
@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
-    x = np.linspace(0, 1, 101)
+    x = np.linspace(0, 1, 1001)
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
     for length in specimen_length:
         for rhs in rhs_list:
@@ -92,15 +92,15 @@ if __name__ == "__main__":
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
-    database.plot()
+    # database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
-    name = f'Hat-Simulation d {domain_num} p {database.num_patches()}'
+    name = f'Homogeneous-Simulation d {domain_num} p {database.num_patches()}'
     configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
     # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
     # Configurations are evaluated over at the following locations.
-    x = np.linspace(0, 1, 101)
+    x = np.linspace(0, 1, 1001)
 
     # Perform calculations on the database.
     print(f'{configurations.num_configurations()} are in this database')
@@ -119,6 +119,22 @@ if __name__ == "__main__":
     config.plot(x, material=material)
 
     # Compare the two error norms.
+    configurations.error(x, parallel=parallel)
     configurations.sort('error')
     configurations.database.plot.scatter('error', 'error_to_exact')
     plt.show()
+
+    # import pandas as pd
+    # config = configurations.database.iloc[0, 0]
+    # x = np.linspace(0, 1, 101)
+    # config.plot(x, material=material)
+    # print('e= ', config.error(x))
+    # # u = config.domain_primal(x)
+    # # rhs = config.domain_rhs(x)
+    # # collection = {'x': x}
+    # # for d in range(domain_num):
+    # #     collection[f"u{d + 1}"] = u[d]
+    # #     collection[f"rhs{d + 1}"] = rhs[d]
+    # # data = pd.DataFrame(collection)
+    # # data.to_csv(f"{name}.csv")
+    # plt.show()
