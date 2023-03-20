@@ -187,7 +187,7 @@ class Test(ABC):
         """
         mirrored_test = self.__deepcopy__()
         mirrored_test.u = mirrored_test.u[::-1]
-        mirrored_test.g = -mirrored_test.g[::-1]
+        mirrored_test.rhs = mirrored_test.rhs[::-1]
         return mirrored_test
 
     def plot(self, axis=None):
