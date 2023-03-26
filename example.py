@@ -88,8 +88,8 @@ if __name__ == "__main__":
     # Problem definition.
     problem_length = 1.  # Length of the problem.
     problem_h = 0.2  # Width of the hat function.
-    problem_a = 0  # Left boundary value.
-    problem_b = -0.05  # Right boundary value.
+    problem_a = 0.  # Left boundary value.
+    problem_b = 0.  # Right boundary value.
     domain_num = 2  # Amount subdomains.
     domain_length = 0.525  # Length of the subdomains.
     problem = Homogeneous(problem_length, problem_a, problem_b, domain_length, domain_num)
@@ -106,8 +106,9 @@ if __name__ == "__main__":
     # Perform test according to the following test matrix.
     specimen_length = 1  # specimen length.
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(0.00, 0.025,  -1.0), (0.05, 0.2, -2.0), (0.75, 0.95,  1.0)])  # Test contains the particular parts.
-    test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0, rhs, material)
+    # rhs = partial(rhs_hats, [(0.00, 0.025,  -1.0), (0.05, 0.2, -2.0), (0.75, 0.95,  1.0)])  # Test contains the particular parts.
+    rhs = partial(rhs_hats, [])
+    test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0.05, rhs, material)
 
     # Add the test to the database.
     database.add_test(test)
@@ -118,6 +119,13 @@ if __name__ == "__main__":
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     configuration = Configuration(problem, database)  # From patch admissibility.
     configuration.plot(x, material=material)
-    configuration.optimize(x, verbose=False)
+    configuration.optimize(x, material=material, verbose=True)
     configuration.plot(x, material=material)
+
+    # Look at the convergence, compare distance to exact solution and overlapping error.
+    configuration._error_comparison = np.array(configuration._error_comparison)
+    plt.figure()
+    plt.xlabel("Overlapping Error $\mathcal{E}$")
+    plt.ylabel("Distance to Exact Solution $e$")
+    plt.loglog(configuration._error_comparison[:, 0], configuration._error_comparison[:, 1], 'o-', linewidth=0.25)
     plt.show()

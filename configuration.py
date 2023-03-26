@@ -68,7 +68,7 @@ class Configuration(object):
             pd = [patches_in_d[0] for patches_in_d in admissibility]
         except IndexError:
             for d in range(len(admissibility)):
-                print(f'Domain {d} has {len(admissibility[d])} patches that satisfy RHS requiments.')
+                print(f'Domain {d} has {len(admissibility[d])} patches that satisfy RHS requirements.')
 
             raise IndexError("There is no patch that satisfies the RHS requirements for a domain.")
 
@@ -101,6 +101,9 @@ class Configuration(object):
         self._rbd.setflags(write=False)
         self.rbd.setflags(write=False)
         self._free_rbd.setflags(write=False)
+
+        # Empty optimization variables.
+        self._error_comparison = []
 
     @property
     def rbd(self):
@@ -360,8 +363,7 @@ class Configuration(object):
         # Calculate error norm, and the distance to the exact solution for each subdomain.
         error = self.error(x)
         ed = self.compare_to_exact(x, material)
-        print(error, ed)
-
+        self._error_comparison.append([error, ed])
 
     def optimize(self, x, verbose=False, material=None):
         r"""
@@ -391,7 +393,9 @@ class Configuration(object):
         # If material is provided it is used to verify the way that we converge to the exact solution.
         callback = None  # Default callback.
         if material is not None:
-            callback = partial(self._store_intermediate(x, material))
+            callback = partial(self._store_intermediate, x, material)
+
+        # callback(params_initial)
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
         options = {'ftol': 1e-30, 'disp': verbose, 'iprint': 2}
@@ -505,4 +509,4 @@ class Configuration(object):
             # Compute the error.
             ed[d] = np.sqrt(u_gap_spline.integral(start, end))
 
-        return ed
+        return np.sum(ed)
