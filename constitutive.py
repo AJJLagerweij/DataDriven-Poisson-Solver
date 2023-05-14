@@ -129,7 +129,7 @@ class LinearMaterial(Constitutive):
     """
     def __init__(self, a):
         r"""
-        This simple linear constitutive equation depends on the bending stiffness :math:`EI`.
+        This simple linear constitutive equation represents a constant conductivity.
         """
         super().__init__()
         self.a = float(a)
