@@ -87,51 +87,34 @@ if __name__ == "__main__":
     # Problem definition.
     problem_length = 1000.  # Length of the problem in mm.
     problem_h = 200.  # Width of the hat function in mm.
+    problem_rhs = 0.2  # Right hand side heating in W / mm.
     problem_a = 0.00  # Left boundary value in degreeC.
     problem_b = -5.  # Right boundary value in degreeC.
-    domain_num = 4  # Amount subdomains.
-    domain_length = 270.  # Length of the subdomains in mm.
-    problem = Hat(problem_length, problem_h, problem_a, problem_b, domain_length, domain_num)
+    domain_num = 4  # 16 # Amount subdomains.
+    domain_length = 287.5  # 109.375 # Length of the subdomains in mm.
+    problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
 
     # Locations for the error and error computations and plots.
-    x = np.linspace(0, problem_length, 101)  # Location in mm.
+    x = np.linspace(0, problem_length, 10001)  # Location in mm.
+    problem.plot()
 
     # Material definition, required for the test, and verification of the exact solution.
     material = LinearMaterial(1000)  # Constant conductivity in W mm / degC
 
-    # Create empty database.
-    database = PatchDatabase()
-
     # Perform test according to the following test matrix.
-    specimen_length = 1000.  # specimen length in mm.
+    specimen_length = 750.  # Specimen length in mm.
     specimen_dx = x[1]  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(0, 25,  -1.0), (50, 200, -2.0), (750, 950,  1.0)])  # Test contains the particular parts.
-    test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0, 0.05, rhs, material)
+    rhs = partial(rhs_hats, [(0, 25,  -1.0e-1), (50, 200, -3.0e-1), (500, 700,  2.0e-1)])  # rhs in test setup.
+    test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., 5., rhs, material)
 
-    # Add the test to the database.
+    # Create empty database and add test to it.
+    database = PatchDatabase()
     database.add_test(test)
     database.mirror()
-    print("\nNumber of patches", database.num_patches())
     test.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     configuration = Configuration(problem, database)  # From patch admissibility.
+    configuration.plot(x, material=material)  # Configuration without optimization.
+    configuration.optimize(x, material=material, verbose=True)  # Minimizing the cost function. Material used for error to exact.
     configuration.plot(x, material=material)
-    configuration.optimize(x, material=material, verbose=True)
-    configuration.plot(x, material=material)
-
-    # Look at the convergence, compare distance to exact solution and overlapping error.
-    configuration._error_comparison = np.array(configuration._error_comparison)
-    plt.figure()
-    plt.xlabel("Overlapping Error $\mathcal{E}$")
-    plt.ylabel("Distance to Exact Solution $e$")
-    plt.loglog(configuration._error_comparison[:, 0], configuration._error_comparison[:, 1], 'o-', linewidth=0.25)
-    plt.show()
-
-    # Export results for dissertation plots.
-    x_exact, u_exact, rhs_exact = problem.exact(x, material)
-    exact = {'x': x_exact, 'u': u_exact, 'rhs': rhs_exact}
-    exact = pd.DataFrame(exact)
-
-
-
