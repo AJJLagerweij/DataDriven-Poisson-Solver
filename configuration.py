@@ -17,13 +17,9 @@ KAUST |br|
 
 # Import external modules
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-from itertools import product
 import numpy as np
-import pandas as pd
-from pandarallel import pandarallel
 from scipy.interpolate import InterpolatedUnivariateSpline
-from scipy.optimize import minimize, Bounds, NonlinearConstraint
+from scipy.optimize import minimize
 from functools import partial
 
 # Import my own scripts.
@@ -70,7 +66,7 @@ class Configuration(object):
             for d in range(len(admissibility)):
                 print(f'Domain {d} has {len(admissibility[d])} patches that satisfy RHS requirements.')
 
-            raise IndexError("There is no patch that satisfies the RHS requirements for a domain.")
+            raise IndexError("No patch that satisfies the RHS requirements for a domain.")
 
         # Initialize the problem.
         self.problem = problem
@@ -379,7 +375,7 @@ class Configuration(object):
         verbose : bool, optional
             Printing the progress of the optimization at every iteration, `False` by default.
         material : Constitutive, optional
-            The constitutive equation for the material considered, if provided it is used to calculate the distance
+            The constitutive equation for the material considered, if provided it is only used to calculate the distance
             between the current solution and the exact solution.
 
         Returns
@@ -399,7 +395,7 @@ class Configuration(object):
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
         options = {'ftol': 1e-30, 'disp': verbose, 'iprint': 2}
-        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP', jac='3-point',
+        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP', jac='3-point', tol=0,
                           options=options, callback=callback)
 
         # Ten ensure that we set the final state of the configuration to the optimal one.
