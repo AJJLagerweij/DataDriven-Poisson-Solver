@@ -99,7 +99,7 @@ class Configuration(object):
         self._free_rbd.setflags(write=False)
 
         # Empty optimization variables.
-        self._error_comparison = []
+        self._intermediate_results = []
 
     @property
     def rbd(self):
@@ -270,7 +270,7 @@ class Configuration(object):
             rhs_domains[d, index] = u_d(x[index])
         return rhs_domains
 
-    def error(self, x):
+    def error(self, x, order='Omega1'):
         r"""
         Calculate the least square domain decomposition error.
 
@@ -283,12 +283,20 @@ class Configuration(object):
         ----------
         x : array
             The locations where the error relation is evaluated.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to Omega1.
 
         Returns
         -------
         float
             The data-driven error.
         """
+        # Test type flag.
+        if order is None:
+            order = 'Omega1'
+        if order not in ('Omega0', 'Omega1', 'Gamma0', 'Gamma1'):
+            raise ValueError("Order flag type must be 'Omega0', 'Omega1', 'Gamma0' or 'Gamma1'")
+
         # Get fields for current state of configuration.
         ud = self.domain_primal(x)
 
@@ -313,16 +321,30 @@ class Configuration(object):
                         if index[0].shape[0] > 3:
                             u_gap = InterpolatedUnivariateSpline(x[index], (ud[a, index] - ud[b, index]), k=3)
                             du_gap = u_gap.derivative()
-                            local_error = u_gap(x[index])**2 + du_gap(x[index])**2
-                            local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
-                            error += 0.5 * local_error.integral(overlap_start, overlap_end)
+                            if order == 'Omega0':
+                                local_error = u_gap(x[index])**2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * local_error.integral(overlap_start, overlap_end)
+                            if order == 'Omega1':
+                                local_error = u_gap(x[index]) ** 2 + du_gap(x[index])**2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * local_error.integral(overlap_start, overlap_end)
+                            if order == 'Gamma0':
+                                local_error = u_gap(x[index]) ** 2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * (local_error(overlap_start) + local_error(overlap_end))
+                            if order == 'Gamma1':
+                                local_error = u_gap(x[index]) ** 2 + du_gap(x[index])**2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * (local_error(overlap_start) + local_error(overlap_end))
+
 
                         else:
                             raise ValueError("Insufficient sample points in overlap.")
 
         return error
 
-    def _objective_function(self, params, x):
+    def _objective_function(self, params, x, order=None):
         """
         The objective function that will be minimized.
 
@@ -335,6 +357,8 @@ class Configuration(object):
             The input parameters consisting of the free rigid body motions.
         x : array
             Locations where the objective function has to be evaluated.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
 
         Returns
         -------
@@ -347,21 +371,40 @@ class Configuration(object):
         self.rbd = rbd
 
         # Calculate error norm.
-        error = self.error(x)
+        error = self.error(x, order=order)
         return error
 
-    def _store_intermediate(self, x, material, params):
+    def _store_intermediate(self, x, material, params, order=None):
+        """
+        Store intermediate results of the optimization.
+
+        Parameters
+        ----------
+        x : array
+            Locations where the objective function needs to be analyzed.
+        material : Constitutive, optional
+            The constitutive equation for the material considered, if provided it is only used to calculate the distance
+            between the current solution and the exact solution.
+        params : array
+            The input parameters consisting of the free rigid body motions.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
+
+        Returns
+        -------
+
+        """
         # Unpack the rbd parameters.
         rbd = np.copy(self.rbd)
         rbd[self._free_rbd] = params
         self.rbd = rbd
 
         # Calculate error norm, and the distance to the exact solution for each subdomain.
-        error = self.error(x)
+        error = self.error(x, order=order)
         ed = self.compare_to_exact(x, material)
-        self._error_comparison.append([error, ed])
+        self._intermediate_results.append(np.hstack(([error, ed], rbd.flatten())))
 
-    def optimize(self, x, verbose=False, material=None):
+    def optimize(self, x, verbose=False, material=None, order=None):
         r"""
         Find the optimal rigid body displacements for each domain.
 
@@ -377,6 +420,8 @@ class Configuration(object):
         material : Constitutive, optional
             The constitutive equation for the material considered, if provided it is only used to calculate the distance
             between the current solution and the exact solution.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
 
         Returns
         -------
@@ -389,17 +434,14 @@ class Configuration(object):
         # If material is provided it is used to verify the way that we converge to the exact solution.
         callback = None  # Default callback.
         if material is not None:
-            callback = partial(self._store_intermediate, x, material)
-
-        # callback(params_initial)
+            self._store_intermediate(x, material, params_initial, order=order)
+            callback = partial(self._store_intermediate, x, material, order=order)
 
         # Sequential Least Squares Programming (The best optimization approach for this problem)
         options = {'ftol': 1e-30, 'disp': verbose, 'iprint': 2}
-        result = minimize(self._objective_function, params_initial, args=x, method='SLSQP', jac='3-point', tol=0,
-                          options=options, callback=callback)
+        result = minimize(self._objective_function, params_initial, args=(x, order), method='SLSQP', jac='3-point',
+                          tol=0, options=options, callback=callback)
 
-        # Ten ensure that we set the final state of the configuration to the optimal one.
-        self._objective_function(result.x, x)
         return result
 
     def plot(self, x, material=None, title=None, path=None):
@@ -435,7 +477,10 @@ class Configuration(object):
         ax_g = axis[1]  # Internal load axis for moment
 
         # Calculate the value of the cost function, and format it in a string for display purposes.
-        result = _m(rf"$\mathcal{{E}}={self.error(x):4.2e}$" + "\n" + rf"$e={self.compare_to_exact(x, material):4.2e}$")
+        result = _m(rf"$J^\Omega_0={self.error(x, order='Omega0'):4.2e}$" + "\n" +
+                    rf"$J^\Omega_1={self.error(x, order='Omega1'):4.2e}$" + "\n" +
+                    rf"$J^\Gamma_1={self.error(x, order='Gamma1'):4.2e}$" + "\n" +
+                    rf"$e={self.compare_to_exact(x, material):4.2e}$")
 
         # Get the reference solution and plot it.
         if material is not None:
@@ -472,7 +517,7 @@ class Configuration(object):
 
         This is measured as the Euclidean norm :math:`L^2` between the domain primal and the reference primal.
 
-        .. math:: e = \sum_{d=1}^D \sqrt{\int_{\Omega_d} \| u_d - u^{\text{exact}} \|^2 dx}
+        .. math:: e = \sum_{d=1}^D \int_{\Omega_d} \| u_d - u^{\text{exact}} \|^2 dx
 
         Parameters
         ----------
@@ -503,6 +548,6 @@ class Configuration(object):
             u_gap_spline = InterpolatedUnivariateSpline(x_exact[index], u_gap, k=3)
 
             # Compute the error.
-            ed[d] = np.sqrt(u_gap_spline.integral(start, end))
+            ed[d] = (u_gap_spline.integral(start, end))
 
         return np.sum(ed)
