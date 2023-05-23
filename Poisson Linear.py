@@ -65,8 +65,6 @@ from constitutive import LinearMaterial
 
 # Setup basic plotting properties.
 plt.close('all')
-plt.rcParams['svg.fonttype'] = 'none'
-plt.rcParams['backend'] = 'Qt5agg'
 
 
 # The right-hand side skeleton equation.
