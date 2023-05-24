@@ -294,8 +294,8 @@ class Configuration(object):
         # Test type flag.
         if order is None:
             order = 'Omega1'
-        if order not in ('Omega0', 'Omega1', 'Gamma0', 'Gamma1'):
-            raise ValueError("Order flag type must be 'Omega0', 'Omega1', 'Gamma0' or 'Gamma1'")
+        if order not in ('Omega0', 'Omega1', 'Gamma0', 'Gamma1', 'Omega1_weights'):
+            raise ValueError("Order flag type must be 'Omega0', 'Omega1', 'Gamma0', 'Gamma1' or 'Omega1_weights'")
 
         # Get fields for current state of configuration.
         ud = self.domain_primal(x)
@@ -337,7 +337,10 @@ class Configuration(object):
                                 local_error = u_gap(x[index]) ** 2 + du_gap(x[index])**2
                                 local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
                                 error += 0.5 * (local_error(overlap_start) + local_error(overlap_end))
-
+                            if order == 'Omega1_weights':
+                                local_error = u_gap(4*x[index]) ** 2 + du_gap(x[index]) ** 2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * local_error.integral(overlap_start, overlap_end)
 
                         else:
                             raise ValueError("Insufficient sample points in overlap.")
