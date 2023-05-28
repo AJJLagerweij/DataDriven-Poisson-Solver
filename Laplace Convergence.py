@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # problem.plot()
 
     # Material definition, required for the test, and verification of the exact solution.
-    material = LinearMaterial(1)  # Constant conductivity in W mm / degC
+    material = LinearMaterial(1)  # Constant conductivity in W mm / degC, this value will not change the result.
 
     # Perform test according to the following test matrix.
     specimen_length = 1.  # Specimen length in mm.
