@@ -110,5 +110,6 @@ if __name__ == "__main__":
     x = np.linspace(0, problem_length, 10001)  # Spatial discretization in mm.
     configuration = Configuration(problem, database)  # From patch admissibility.
     configuration.plot(x, material=material)  # Configuration without optimization.
-    configuration.optimize(x, material=material, verbose=True)  # Minimizing the cost function. Material used for error to exact.
+    configuration.optimize(x, material=material, order='Omega1', verbose=True)  # Minimizing the cost function. Material used for error to exact.
     configuration.plot(x, material=material)
+    plt.show()
