@@ -338,7 +338,11 @@ class Configuration(object):
                                 local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
                                 error += 0.5 * (local_error(overlap_start) + local_error(overlap_end))
                             if order == 'Omega1_weights':
-                                local_error = 4*u_gap(x[index]) ** 2 + du_gap(x[index]) ** 2
+                                o = (overlap_end-overlap_start)
+                                L = self.problem._length
+                                A = 1
+                                B = (3*L**2 - o**2) / 12
+                                local_error = A*u_gap(x[index]) ** 2 + B*du_gap(x[index]) ** 2
                                 local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
                                 error += 0.5 * local_error.integral(overlap_start, overlap_end)
 
@@ -553,4 +557,5 @@ class Configuration(object):
             # Compute the error.
             ed[d] = (u_gap_spline.integral(start, end))
 
-        return np.sum(ed)
+        error = np.sum(ed)
+        return error

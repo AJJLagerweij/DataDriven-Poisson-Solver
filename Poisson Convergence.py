@@ -23,14 +23,14 @@ KAUST
 """
 
 # Importing required modules.
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from functools import partial
 
 # Importing my own scripts.
 from configuration import Configuration
-from problem import Homogeneous
+from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
 from constitutive import LinearMaterial
@@ -39,79 +39,47 @@ from constitutive import LinearMaterial
 plt.close('all')
 
 
+# The right-hand side skeleton equation.
+def rhs_hats(hats, x):
+    gx = np.zeros_like(x)  # Initialize rhs values
+
+    # For each hat in hats we set the appropriate values.
+    for hat in hats:
+        a, b, value = hat
+        index = (a <= x) & (x <= b)
+        gx[index] = value
+    return gx
+
+
 if __name__ == "__main__":
     # Problem definition.
-    problem_length = 1.  # Length of the problem in mm.
+    problem_length = 1000.  # Length of the problem in mm.
+    problem_h = 200.  # Width of the hat function in mm.
+    problem_rhs = 0.2  # Right hand side heating in W / mm.
     problem_a = 0.  # Left boundary value in degreeC.
-    problem_b = 0.  # Right boundary value in degreeC.
+    problem_b = -5.  # Right boundary value in degreeC.
     domain_num = 2  # Amount subdomains.
-    domain_length = 0.525  # Length of the subdomains in mm.
-    problem = Homogeneous(problem_length, problem_a, problem_b, domain_length, domain_num)
+    domain_length = 525  # Length of the subdomains in mm.
+    problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
     # problem.plot()
 
     # Material definition, required for the test, and verification of the exact solution.
-    material = LinearMaterial(1)  # Constant conductivity in W mm / degC, this value will not change the result.
+    material = LinearMaterial(1500)  # Constant conductivity in W mm / degC, this value will not change the result.
 
     # Perform test according to the following test matrix.
-    specimen_length = 1.  # Specimen length in mm.
-    specimen_dx = 0.001  # mm discretization step size (measurement spacial resolution)
-    rhs = lambda x: 0.*x  # rhs in test setup.
+    specimen_length = 1000  # Specimen length in mm.
+    specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
+    rhs = partial(rhs_hats, [(400, 600, problem_rhs)])  # rhs in test setup.
     test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., 0., rhs, material)
 
     # Create empty database and add test to it.
     database = PatchDatabase()
     database.add_test(test)
     database.mirror()
-    # test.plot()
+    test.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     x = np.linspace(0, problem_length, 1001)  # Spatial discretization in mm.
-
-    # Two configurations for J0.
-    configuration = Configuration(problem, database)
-    configuration.rbd = np.array([[0, -0.6], [0.6, 0]])  # Small cost, far away from the solution.
-    configuration.plot(x, material=material)
-    cost1 = configuration.error(x, order='Omega0')
-    error1 = configuration.compare_to_exact(x, material)
-    ud1 = configuration.domain_primal(x)
-
-    configuration.rbd = np.array([[0, -0.5], [-0.5, 0]])  # Large cost, closer to the solution.
-    configuration.plot(x, material=material)
-    cost2 = configuration.error(x, order='Omega0')
-    error2 = configuration.compare_to_exact(x, material)
-    ud2 = configuration.domain_primal(x)
-
-    J0Omega_configurations = {'x': x}
-    for d in range(2):
-        J0Omega_configurations[f'u{d}_1'] = ud1[d]
-        J0Omega_configurations[f'u{d}_2'] = ud2[d]
-    J0Omega_configurations = pd.DataFrame(J0Omega_configurations)
-    J0Omega_configurations.to_csv('J0_configurations.csv')
-    J0Omega_summary = pd.DataFrame({'cost_1': [cost1], 'error_1': [error1], 'cost_2': [cost2], 'error_2': [error2]})
-    J0Omega_summary.to_csv('J0_summary.csv')
-
-    # Two configurations for J1.
-    configuration = Configuration(problem, database)
-    configuration.rbd = np.array([[0, -0.5], [0.5, 0]])  # Small cost, far away from the solution.
-    configuration.plot(x, material=material)
-    cost1 = configuration.error(x, order='Omega1')
-    error1 = configuration.compare_to_exact(x, material)
-    ud1 = configuration.domain_primal(x)
-
-    configuration.rbd = np.array([[0, -0.6], [-0.6, 0]])  # Large cost, closer to the solution.
-    configuration.plot(x, material=material)
-    cost2 = configuration.error(x, order='Omega1')
-    error2 = configuration.compare_to_exact(x, material)
-    ud2 = configuration.domain_primal(x)
-
-    J1Omega_configurations = {'x': x}
-    for d in range(2):
-        J1Omega_configurations[f'u{d}_1'] = ud1[d]
-        J1Omega_configurations[f'u{d}_2'] = ud2[d]
-    J0Omega_configurations = pd.DataFrame(J1Omega_configurations)
-    J0Omega_configurations.to_csv('J1_configurations.csv')
-    J1Omega_summary = pd.DataFrame({'cost_1': [cost1], 'error_1': [error1], 'cost_2': [cost2], 'error_2': [error2]})
-    J1Omega_summary.to_csv('J1_summary.csv')
 
     # Bad initial guess, and verifying how J0Omega converges.
     configuration = Configuration(problem, database)  # From patch admissibility.
@@ -175,10 +143,10 @@ if __name__ == "__main__":
     plt.ylabel('Cost')
 
     # Create surface plots comparing cost vs error to exact.
-    num = 41
-    lim = 1.25
-    rotation_domain1 = np.linspace(-lim, lim, num=num)
-    rotation_domain2 = np.linspace(-lim, lim, num=num)
+    num = 11
+    lim = 4
+    rotation_domain1 = np.linspace(-lim, 0, num=num)
+    rotation_domain2 = np.linspace(0, lim, num=num)
     costJ0Omega = np.zeros((num, num))
     costJ1Omega = np.zeros((num, num))
     costJ0Gamma = np.zeros((num, num))
@@ -209,35 +177,35 @@ if __name__ == "__main__":
     axs[0, 0].set_ylabel("Tip displacement domain 1")
     axs[0, 0].set_xlabel("Tip displacement domain 2")
     fig.colorbar(costH0Omega_surface, ax=axs[0, 0], label="$J^\Omega_0$")
-    axs[0, 0].plot(intermediate_J0Omega['rot1'], intermediate_J0Omega['rot2'], 's:', color='C1')
+    # axs[0, 0].plot(intermediate_J0Omega['rot1'], intermediate_J0Omega['rot2'], 's:', color='C1')
 
     # Cost J^Omega_1
     costH1Omega_surface = axs[0, 1].contourf(rotation_domain1, rotation_domain2, costJ1Omega)
     axs[0, 1].set_ylabel("Tip displacement domain 1")
     axs[0, 1].set_xlabel("Tip displacement domain 2")
     fig.colorbar(costH1Omega_surface, ax=axs[0, 1], label="$J^\Omega_1$")
-    axs[0, 1].plot(intermediate_J1Omega['rot1'], intermediate_J1Omega['rot2'], 's:', color='C2')
+    # axs[0, 1].plot(intermediate_J1Omega['rot1'], intermediate_J1Omega['rot2'], 's:', color='C2')
 
     # Cost J^Gamma_0
     costH0Gamma_surface = axs[0, 2].contourf(rotation_domain1, rotation_domain2, costJ0Gamma)
     axs[0, 2].set_ylabel("Tip displacement domain 1")
     axs[0, 2].set_xlabel("Tip displacement domain 2")
     fig.colorbar(costH0Gamma_surface, ax=axs[0, 2], label="$J^\Gamma_0")
-    axs[0, 2].plot(intermediate_J0Gamma['rot1'], intermediate_J0Gamma['rot2'], 's:', color='C3')
+    # axs[0, 2].plot(intermediate_J0Gamma['rot1'], intermediate_J0Gamma['rot2'], 's:', color='C3')
 
     # Cost J^Gamma_1
     costH1Gamma_surface = axs[1, 0].contourf(rotation_domain1, rotation_domain2, costJ1Gamma)
     axs[1, 0].set_ylabel("Tip displacement domain 1")
     axs[1, 0].set_xlabel("Tip displacement domain 2")
     fig.colorbar(costH1Gamma_surface, ax=axs[1, 0], label="$J^\Gamma_1$")
-    axs[1, 0].plot(intermediate_J1Gamma['rot1'], intermediate_J1Gamma['rot2'], 's:', color='C4')
+    # axs[1, 0].plot(intermediate_J1Gamma['rot1'], intermediate_J1Gamma['rot2'], 's:', color='C4')
 
     # Cost J^Omega_1_weighted
     costH1Omega_w_surface = axs[1, 1].contourf(rotation_domain1, rotation_domain2, costJ1Omega_w)
     axs[1, 1].set_ylabel("Tip displacement domain 1")
     axs[1, 1].set_xlabel("Tip displacement domain 2")
     fig.colorbar(costH1Omega_w_surface, ax=axs[1, 1], label="$J^\Omega_w$")
-    axs[1, 1].plot(intermediate_J1Omega_w['rot1'], intermediate_J1Omega_w['rot2'], 's:', color='C5')
+    # axs[1, 1].plot(intermediate_J1Omega_w['rot1'], intermediate_J1Omega_w['rot2'], 's:', color='C5')
 
     # Error surface.
     error_surface = axs[1, 2].contourf(rotation_domain1, rotation_domain2, error)
@@ -251,4 +219,4 @@ if __name__ == "__main__":
                                    'cost0Omega': costJ0Omega.flatten(), 'cost1Omega': costJ1Omega.flatten(),
                                    'cost0Gamma': costJ0Gamma.flatten(), 'cost1Gamma': costJ1Gamma.flatten(),
                                    'cost1Omega_weights': costJ1Omega_w.flatten(), 'error': error.flatten()})
-    error_surfaces.to_csv("Error_surfaces_Laplace.csv")
+    error_surfaces.to_csv("Error_surfaces_Poisson.csv")
