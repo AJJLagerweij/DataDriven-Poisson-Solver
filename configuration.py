@@ -103,6 +103,9 @@ class Configuration(object):
         self.translation.setflags(write=False)
         self._free_translation.setflags(write=False)
 
+        # Empty optimization variables.
+        self._intermediate_results = []
+
     @property
     def rbd(self):
         rbd = np.copy(self._rbd)
@@ -243,25 +246,35 @@ class Configuration(object):
             rhs_domains[d, index] = u_d(x[index])
         return rhs_domains
 
-    def error(self, x):
+    def error(self, x, order='Omega1'):
         r"""
         Calculate the least square domain decomposition error.
 
         The error represents how wel the primal fields in the overlapping areas match. The lower the error the
         more the primal fields in the overlapping areas agree with each other.
 
-        .. math:: \mathcal{E} = \sum_{a=1}^D \sum_{b>a}^D \int_{\Omega_a\cap\Omega_b} \| u_a - u_b \|^2 dx
+        .. math:: J = \sum_{a=1}^D \sum_{b>a}^D \int_{\Omega_a\cap\Omega_b} \| u_a - u_b \|^2 dx
+
+        Other errors are also available.
 
         Parameters
         ----------
         x : array
             The locations where the error relation is evaluated.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to Omega1.
 
         Returns
         -------
         float
             The data-driven error.
         """
+        # Test type flag.
+        if order is None:
+            order = 'Omega1'
+        if order not in ('Omega0', 'Omega1', 'Gamma0', 'Gamma1', 'Omega1_weights'):
+            raise ValueError("Order flag type must be 'Omega0', 'Omega1', 'Gamma0', 'Gamma1' or 'Omega1_weights'")
+
         # Get fields for current state of configuration.
         ud = self.domain_primal(x)
 
@@ -286,16 +299,33 @@ class Configuration(object):
                         if index[0].shape[0] > 3:
                             u_gap = InterpolatedUnivariateSpline(x[index], (ud[a, index] - ud[b, index]), k=3)
                             du_gap = u_gap.derivative()
-                            local_error = u_gap(x[index])**2 + du_gap(x[index])**2
-                            local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
-                            error += 0.5 * local_error.integral(overlap_start, overlap_end)
+                            if order == 'Omega0':
+                                local_error = u_gap(x[index])**2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * local_error.integral(overlap_start, overlap_end)
+                            if order == 'Omega1':
+                                local_error = u_gap(x[index]) ** 2 + du_gap(x[index])**2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * local_error.integral(overlap_start, overlap_end)
+                            if order == 'Gamma0':
+                                local_error = u_gap(x[index]) ** 2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * (local_error(overlap_start) + local_error(overlap_end))
+                            if order == 'Gamma1':
+                                local_error = u_gap(x[index]) ** 2 + du_gap(x[index])**2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * (local_error(overlap_start) + local_error(overlap_end))
+                            if order == 'Omega1_weights':
+                                local_error = 4*u_gap(x[index]) ** 2 + du_gap(x[index]) ** 2
+                                local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
+                                error += 0.5 * local_error.integral(overlap_start, overlap_end)
 
                         else:
                             raise ValueError("Insufficient sample points in overlap.")
 
         return error
 
-    def _objective_function(self, params, x):
+    def _objective_function(self, params, x, order=None):
         """
         The objective function that will be minimized.
 
@@ -305,9 +335,11 @@ class Configuration(object):
         Parameters
         ----------
         params : array
-            The input parameters consisting of the translations.
+            The input parameters consisting of the free rigid body motions.
         x : array
             Locations where the objective function has to be evaluated.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
 
         Returns
         -------
@@ -325,16 +357,49 @@ class Configuration(object):
         self.translation = translation
 
         # Calculate error norm.
-        error = self.error(x)
+        error = self.error(x, order=order)
         return error
 
-    def optimize(self, x, verbose=False):
-        r"""
-        Find the optimal coordinate translations for each domain.
+    def _store_intermediate(self, x, material, params, order=None):
+        """
+        Store intermediate results of the optimization.
 
-        A bounded optimization is used, which tries to find the best coordinate transformations such that the error
-        is minimized. However, some translations are fixed (these will not be exposed to the optimization) and all
-        free translations have bounds, these bounds will be satisfied.
+        Parameters
+        ----------
+        x : array
+            Locations where the objective function needs to be analyzed.
+        material : Constitutive, optional
+            The constitutive equation for the material considered, if provided it is only used to calculate the distance
+            between the current solution and the exact solution.
+        params : array
+            The input parameters consisting of the free rigid body motions.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
+        """
+        # Unpack the rbd freedom.
+        rbd = np.copy(self.rbd)
+        rbd[self._free_rbd] = params[:np.count_nonzero(self._free_rbd)]
+        self.rbd = rbd
+
+        # Unpack the translation parameters.
+        translation = np.copy(self.translation)
+        translation[self._free_translation] = params[np.count_nonzero(self._free_rbd):]
+        self.translation = translation
+
+        # Calculate error norm, and the distance to the exact solution for each subdomain.
+        error = self.error(x, order=order)
+        ed = self.compare_to_exact(x, material)
+        self._intermediate_results.append(np.hstack(([error, ed], rbd.flatten())))
+
+        # Store intermediate results.
+        self._intermediate_results.append(np.hstack(([error, ed], rbd.flatten(), translation.flatten())))
+
+    def optimize(self, x, verbose=False, material=None, order=None):
+        r"""
+        Find the optimal rigid body displacements for each domain.
+
+        A bounded optimization is used, which tries to find the best rigid body displacements such that the error
+        is minimized.
 
         Parameters
         ----------
@@ -342,6 +407,11 @@ class Configuration(object):
             Locations where the objective function needs to be analyzed.
         verbose : bool, optional
             Printing the progress of the optimization at every iteration, `False` by default.
+        material : Constitutive, optional
+            The constitutive equation for the material considered, if provided it is only used to calculate the distance
+            between the current solution and the exact solution.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
 
         Returns
         -------
@@ -356,13 +426,16 @@ class Configuration(object):
                         np.array(self._translation_bounds)[self._free_translation, 1]))
         bounds = Bounds(lb, ub)
 
+        # If material is provided it is used to verify the way that we converge to the exact solution.
+        callback = None  # Default callback.
+        if material is not None:
+            self._store_intermediate(x, material, params_initial, order=order)
+            callback = partial(self._store_intermediate, x, material, order=order)
+
         # Sequential Least Squares Programming (The best optimization approach for this problem)
         options = {'ftol': 1e-25, 'maxiter': 20000, 'disp': verbose, 'iprint': 2}
-        result = minimize(self._objective_function, params_initial, args=x, bounds=bounds, method='SLSQP',
-                          tol=0, jac='3-point', options=options)
-
-        # Ten ensure that we set the final state of the configuration to the optimal one.
-        self._objective_function(result.x, x)
+        result = minimize(self._objective_function, params_initial, args=(x, order), bounds=bounds, method='SLSQP',
+                          tol=0, jac='3-point', options=options, callback=callback)
         return result
 
     def plot(self, x, material=None, title=None, path=None):
@@ -398,7 +471,11 @@ class Configuration(object):
         ax_g = axis[1]  # Internal load axis for moment
 
         # Calculate the value of the cost function, and format it in a string for display purposes.
-        result = _m(rf"$\mathcal{{E}}={self.error(x):4.2e}$" + "\n" + rf"$e={self.compare_to_exact(x, material):4.2e}$")
+        # Calculate the value of the cost function, and format it in a string for display purposes.
+        result = _m(rf"$J^\Omega_0={self.error(x, order='Omega0'):4.2e}$" + "\n" +
+                    rf"$J^\Omega_1={self.error(x, order='Omega1'):4.2e}$" + "\n" +
+                    rf"$J^\Gamma_1={self.error(x, order='Gamma1'):4.2e}$" + "\n" +
+                    rf"$e={self.compare_to_exact(x, material):4.2e}$")
 
         # Get the reference solution and plot it.
         if material is not None:
@@ -466,7 +543,7 @@ class Configuration(object):
             u_gap_spline = InterpolatedUnivariateSpline(x_exact[index], u_gap, k=3)
 
             # Compute the error.
-            error += np.sqrt(u_gap_spline.integral(start, end))
+            error += (u_gap_spline.integral(start, end))
 
         return error
 
@@ -603,7 +680,7 @@ class ConfigurationDatabase(object):
         """
         return len(self.database)
 
-    def optimize(self, x, parallel=False):
+    def optimize(self, x, material=None, order=None, parallel=False):
         r"""
         Apply the optimization function to all configurations considered.
 
@@ -617,6 +694,11 @@ class ConfigurationDatabase(object):
         ----------
         x : array
             Locations where the objective function needs to be analyzed.
+        material : Constitutive, optional
+            The constitutive equation for the material considered, if provided it is only used to calculate the distance
+            between the current solution and the exact solution.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to `None`.
         parallel : bool, optional
             `True` if the computation should be performed in parallel, `False` if it should be in series.
 
@@ -628,7 +710,7 @@ class ConfigurationDatabase(object):
         # Create partial optimization function that contains all fixed information.
         def function(config):
             """The wrapper around the :py:meth:`Configuration.optimize` function."""
-            result = config.optimize(x)
+            result = config.optimize(x, material=material, order=order)
             out = pd.Series(
                 [config, result.fun, config.translation, result.success])
             return out
@@ -649,7 +731,7 @@ class ConfigurationDatabase(object):
                 self.database[['configuration', 'error', 'translation',
                                'success']] = self.database.configuration.apply(function)
 
-    def error(self, x, parallel=False):
+    def error(self, x, order=None, parallel=False):
         r"""
         Apply the error calculation function to all configurations considered and sort based upon it.
 
@@ -659,6 +741,8 @@ class ConfigurationDatabase(object):
         ----------
         x : array
             Locations where the objective function needs to be analyzed.
+        order : string, optional
+            Defines the type of norm in the cost function. Defaults to Omega1.
         parallel : bool, optional
             `True` if the computation should be performed in parallel, `False` if it should be in series.
 
@@ -670,7 +754,7 @@ class ConfigurationDatabase(object):
         # Create partial optimization function that contains all fixed information.
         def function(config):
             """The wrapper around the :py:meth:`Configuration.error` function."""
-            error = config.error(x)
+            error = config.error(x, order=order)
             return error
 
         # Apply the optimization function to all configurations.
