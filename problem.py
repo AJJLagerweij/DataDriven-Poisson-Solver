@@ -389,11 +389,11 @@ class Problem(Domain, ABC):
 
 class Hat(Problem):
     r"""
-    A domain with Dirichlet boundaries of :math:`u(0)=a` and :math:`u(L)=b', and a right hand side of the equation
-    that is zero except for the region of a width h on the middle of the domain.
+    A domain with Dirichlet boundaries :math:`a`, and :math:`b`, and a right hand side :math:`g(x)` that is zero
+    except for the region of a width h on the middle of the domain.
 
     .. math::
-        rhs = \begin{cases}
+        g(x) = \begin{cases}
                 0 & 0 \leq x < \frac{L-h}/2 \\
                 1 & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
                 0 & \frac{L-2}/2 < x \leq L
@@ -405,6 +405,12 @@ class Hat(Problem):
         Total length of the beam.
     h : float
         Length over which the right hand side is nonzero.
+    rhs_magnitude : float
+        Magnitude of the right hand side.
+    a : float
+        Left boundary value, :math:`u(0)=a`.
+    b : float
+        Right boundary value, :math:`u(L)=b`.
     domain_length : float
         Length of the subdomains.
     num_domains : int
@@ -420,15 +426,15 @@ class Hat(Problem):
         A list with the right-hand side of the differential equation in linear segments.
     """
 
-    def __init__(self, length, h, a, b, domain_length, num_domains):
+    def __init__(self, length, h, rhs_magnitude, a, b, domain_length, num_domains):
         r"""
-        A domain with Dirichlet boundaries of :math:`u(0)=a` and :math:`u(L)=b'. Whith a right hand side of the
-        equation that is zero except for the region of a width h on the middle of the domain.
+        A domain with Dirichlet boundaries of zero, and a right hand side of the equation that is zero except for the
+        region of a width h on the middle of the domain.
 
         .. math::
             rhs = \begin{cases}
                     0 & 0 \leq x < \frac{L-h}/2 \\
-                    1 & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
+                    \text{magnitude} & \frac{L-h}/2 \leq x \leq \frac{L-2}/2 \\
                     0 & \frac{L-2}/2 < x \leq L
                 \end{cases}
         """
@@ -437,6 +443,7 @@ class Hat(Problem):
         # Store initialize properties.
         self._length = length
         self._h = h
+        self._rhs_magnitude = rhs_magnitude
         self._a = a
         self._b = b
 
@@ -448,7 +455,7 @@ class Hat(Problem):
                      PointConstraint(length, b)]
 
         self.rhs = [LinearConstraint(0, (length - h)/2, 0, incl_start=True, incl_end=False),
-                    LinearConstraint((length - h)/2, (length + h)/2, 1, incl_start=True, incl_end=True),
+                    LinearConstraint((length - h)/2, (length + h)/2, rhs_magnitude, incl_start=True, incl_end=True),
                     LinearConstraint((length + h)/2, length, 0, incl_start=False, incl_end=True)]
 
         # Call the parent class to split the problem into subdomains.
@@ -471,10 +478,8 @@ class Hat(Problem):
             The coordinates where the displacement was computed :math:`x`, might differ a bit from the input.
         u : array
             The beam displacement :math:`u(x)`.
-        M : array
-            The internal moment of the exact solution.
-        V : array
-            The internal shear of the exact solution.
+        rhs : array
+            The right hand side :math:`g(x)`.
         """
 
         def rhs(x):
@@ -485,7 +490,7 @@ class Hat(Problem):
             index = np.where(((self._length - self._h) / 2 <= x) & (x <= (self._length + self._h) / 2))
 
             # Set the value to the load at these values.
-            gx[index] = 1
+            gx[index] = self._rhs_magnitude
 
             return gx
 
