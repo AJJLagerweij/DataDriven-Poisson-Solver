@@ -153,12 +153,22 @@ if __name__ == "__main__":
     costJ1Gamma = np.zeros((num, num))
     costJ1Omega_w = np.zeros((num, num))
     error = np.zeros((num, num))
+    rot1_grid = np.zeros((num, num))
+    rot2_grid = np.zeros((num, num))
     monotonic = np.full((num, num), True)
 
+    configuration = Configuration(problem, database)
     for i, rot1 in enumerate(rotation_domain1):
         for j, rot2 in enumerate(rotation_domain2):
-            configuration = Configuration(problem, database)
+            # Set degree of freedom.
             configuration.rbd = np.array([[0, rot1], [rot2, 0]])
+
+            # Calculate the slope in the linear section of the domain.
+            ud = configuration.domain_primal(x)
+            rot1_grid[i, j] = (ud[0, 10] - ud[0, 0]) / (x[10] - x[0])
+            rot2_grid[i, j] = (ud[1, 10] - ud[1, 0]) / (x[10] - x[0])
+
+            # Calculate the cost and error functions.
             costJ0Omega[i, j] = configuration.error(x, order='Omega0')
             costJ1Omega[i, j] = configuration.error(x, order='Omega1')
             costJ0Gamma[i, j] = configuration.error(x, order='Gamma0')
@@ -166,56 +176,52 @@ if __name__ == "__main__":
             costJ1Omega_w[i, j] = configuration.error(x, order='Omega1_weights')
             error[i, j] = configuration.compare_to_exact(x, material)
 
-    rotation_domain1 = rotation_domain1 / domain_length
-    rotation_domain2 = rotation_domain2 / domain_length
-
     # Plot the error surfaces.
     fig, axs = plt.subplots(2, 3, layout="constrained")
 
     # Cost J^Omega_0
     costH0Omega_surface = axs[0, 0].contourf(rotation_domain1, rotation_domain2, costJ0Omega)
-    axs[0, 0].set_ylabel("Tip displacement domain 1")
-    axs[0, 0].set_xlabel("Tip displacement domain 2")
+    axs[0, 0].set_ylabel("Slope domain 1")
+    axs[0, 0].set_xlabel("Slope domain 2")
     fig.colorbar(costH0Omega_surface, ax=axs[0, 0], label="$J^\Omega_0$")
     # axs[0, 0].plot(intermediate_J0Omega['rot1'], intermediate_J0Omega['rot2'], 's:', color='C1')
 
     # Cost J^Omega_1
     costH1Omega_surface = axs[0, 1].contourf(rotation_domain1, rotation_domain2, costJ1Omega)
-    axs[0, 1].set_ylabel("Tip displacement domain 1")
-    axs[0, 1].set_xlabel("Tip displacement domain 2")
+    axs[0, 1].set_ylabel("Slope domain 1")
+    axs[0, 1].set_xlabel("Slope domain 2")
     fig.colorbar(costH1Omega_surface, ax=axs[0, 1], label="$J^\Omega_1$")
     # axs[0, 1].plot(intermediate_J1Omega['rot1'], intermediate_J1Omega['rot2'], 's:', color='C2')
 
     # Cost J^Gamma_0
     costH0Gamma_surface = axs[0, 2].contourf(rotation_domain1, rotation_domain2, costJ0Gamma)
-    axs[0, 2].set_ylabel("Tip displacement domain 1")
-    axs[0, 2].set_xlabel("Tip displacement domain 2")
+    axs[0, 2].set_ylabel("Slope domain 1")
+    axs[0, 2].set_xlabel("Slope domain 2")
     fig.colorbar(costH0Gamma_surface, ax=axs[0, 2], label="$J^\Gamma_0")
     # axs[0, 2].plot(intermediate_J0Gamma['rot1'], intermediate_J0Gamma['rot2'], 's:', color='C3')
 
     # Cost J^Gamma_1
     costH1Gamma_surface = axs[1, 0].contourf(rotation_domain1, rotation_domain2, costJ1Gamma)
-    axs[1, 0].set_ylabel("Tip displacement domain 1")
-    axs[1, 0].set_xlabel("Tip displacement domain 2")
+    axs[1, 0].set_ylabel("Slope domain 1")
+    axs[1, 0].set_xlabel("Slope domain 2")
     fig.colorbar(costH1Gamma_surface, ax=axs[1, 0], label="$J^\Gamma_1$")
     # axs[1, 0].plot(intermediate_J1Gamma['rot1'], intermediate_J1Gamma['rot2'], 's:', color='C4')
 
     # Cost J^Omega_1_weighted
     costH1Omega_w_surface = axs[1, 1].contourf(rotation_domain1, rotation_domain2, costJ1Omega_w)
-    axs[1, 1].set_ylabel("Tip displacement domain 1")
-    axs[1, 1].set_xlabel("Tip displacement domain 2")
+    axs[1, 1].set_ylabel("Slope domain 1")
+    axs[1, 1].set_xlabel("Slope domain 2")
     fig.colorbar(costH1Omega_w_surface, ax=axs[1, 1], label="$J^\Omega_w$")
     # axs[1, 1].plot(intermediate_J1Omega_w['rot1'], intermediate_J1Omega_w['rot2'], 's:', color='C5')
 
     # Error surface.
     error_surface = axs[1, 2].contourf(rotation_domain1, rotation_domain2, error)
-    axs[1, 2].set_ylabel("Tip displacement domain 1")
-    axs[1, 2].set_xlabel("Tip displacement domain 2")
+    axs[1, 2].set_ylabel("Slope domain 1")
+    axs[1, 2].set_xlabel("Slope domain 2")
     fig.colorbar(error_surface, ax=axs[1, 2], label="Error to Exact")
 
     # Store the surface plots.
-    grid_rot1, grid_rot2 = np.meshgrid(rotation_domain1, rotation_domain2)
-    error_surfaces = pd.DataFrame({'rot1': grid_rot1.flatten(), 'rot2': grid_rot2.flatten(),
+    error_surfaces = pd.DataFrame({'rot1': rot1_grid.flatten(), 'rot2': rot2_grid.flatten(),
                                    'cost0Omega': costJ0Omega.flatten(), 'cost1Omega': costJ1Omega.flatten(),
                                    'cost0Gamma': costJ0Gamma.flatten(), 'cost1Gamma': costJ1Gamma.flatten(),
                                    'cost1Omega_weights': costJ1Omega_w.flatten(), 'error': error.flatten()})
