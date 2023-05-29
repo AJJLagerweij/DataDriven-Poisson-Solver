@@ -77,10 +77,10 @@ def export_results(configurations, domain_length, problem_length, material):
 
 def configuration_details(configuration, domain_length, problem_length, material):
     # Calculate slope domain 1 and domain two.
-    x = np.array([domain_length, problem_length - domain_length])
-    ud = configuration.domain_primal(x)
-    slope1 = ud[0, 0]/domain_length
-    slope2 = -ud[1, 1]/domain_length
+    up1 = configuration.patches[0].u
+    up2 = configuration.patches[1].u
+    rot1 = up1[-1] / domain_length
+    rot2 = up2[-1] / domain_length
 
     x = np.linspace(0, problem_length, 1001)
     J0Omega = configuration.error(x, order='Omega0')
@@ -89,7 +89,7 @@ def configuration_details(configuration, domain_length, problem_length, material
     J1Gamma = configuration.error(x, order='Gamma1')
     J1Omega_w = configuration.error(x, order='Omega1_weights')
     error = configuration.compare_to_exact(x, material)
-    results = pd.DataFrame({'rot1': [slope1], 'rot2': [slope2], 'J0Omega': [J0Omega], 'J1Omega': [J1Omega],
+    results = pd.DataFrame({'rot1': [rot1], 'rot2': [rot2], 'J0Omega': [J0Omega], 'J1Omega': [J1Omega],
                             'J0Gamma': [J0Gamma], 'J1Gamma': [J1Gamma], 'J1Omega_w': [J1Omega_w], 'error': [error]})
     return results
 
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(400, 600, 0.2)])  # rhs in test setup.
     #b_list = [0.55, 0.9523, 1.1429, 2.2857]
-    b_list = [-7.5, -8, -9]
+    b_list = [-10, -12, -14]
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
