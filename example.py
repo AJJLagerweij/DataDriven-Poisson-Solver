@@ -66,7 +66,6 @@ plt.rcParams['svg.fonttype'] = 'none'
 plt.rcParams['backend'] = 'Qt5agg'
 
 
-# The right-hand side skeleton equation.
 def rhs_hats(hats, x):
     gx = np.zeros_like(x)  # Initialize rhs values
 
@@ -80,14 +79,14 @@ def rhs_hats(hats, x):
 
 if __name__ == "__main__":
     # Run settings.
-    parallel = False
+    parallel = True
 
     # Problem definition.
     problem_length = 1000.  # Length of the problem in mm.
     problem_h = 200.  # Width of the hat function in mm.
     problem_rhs = 0.0  # Right hand side heating in W / mm.
-    problem_a = 0.00  # Left boundary value in degreeC.
-    problem_b = -0.  # Right boundary value in degreeC.
+    problem_a = 0.  # Left boundary value in degreeC.
+    problem_b = -5.  # Right boundary value in degreeC.
     domain_num = 4  # 16 # Amount subdomains.
     domain_length = 287.5  # 109.375 # Length of the subdomains in mm.
     problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
@@ -142,6 +141,7 @@ if __name__ == "__main__":
     configurations.compare_to_exact(x, material, parallel=parallel)
     configurations.database.plot.scatter('error', 'error_to_exact')
     configurations.save(f'{name}.pkl.gz')
+    plt.show()
 
     # # Get the best configuration in DD-error.
     # configurations.sort('error')

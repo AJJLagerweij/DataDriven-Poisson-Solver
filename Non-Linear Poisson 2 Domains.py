@@ -46,13 +46,24 @@ import pandas as pd
 
 # Importing my own scripts.
 from configuration import ConfigurationDatabase
-from problem import Homogeneous
+from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
 from constitutive import LinearMaterial
 
 # Setup basic plotting properties.
 plt.close('all')
+
+
+def rhs_hats(hats, x):
+    gx = np.zeros_like(x)  # Initialize rhs values
+
+    # For each hat in hats we set the appropriate values.
+    for hat in hats:
+        a, b, value = hat
+        index = (a <= x) & (x <= b)
+        gx[index] = value
+    return gx
 
 
 def export_results(configurations, domain_length, problem_length, material):
@@ -89,28 +100,31 @@ if __name__ == "__main__":
 
     # Problem definition.
     problem_length = 1000.  # Length of the problem in mm.
+    problem_h = 200.  # Width of the hat function in mm.
+    problem_rhs = 0.2  # Right hand side heating in W / mm.
     problem_a = 0.  # Left boundary value in degreeC.
-    problem_b = 0.  # Right boundary value in degreeC.
+    problem_b = -5.  # Right boundary value in degreeC.
     domain_num = 2  # Amount subdomains.
     domain_length = 525  # Length of the subdomains in mm.
-    problem = Homogeneous(problem_length, problem_a, problem_b, domain_length, domain_num)
+    problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
     # problem.plot()
 
     # Material definition, required for the test, and verification of the exact solution.
     material = LinearMaterial(1000)  # Constant conductivity in W mm / degC
 
     # Perform test according to the following test matrix.
-    specimen_length = 1000.  # Specimen length in mm.
+    specimen_length = 1500.  # Specimen length in mm.
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
-    rhs = lambda x: 0.*x  # rhs in test setup.
-    b_list = [0.55, 0.9523, 1.1429, 2.2857]
+    rhs = partial(rhs_hats, [(400, 600, 0.2)])  # rhs in test setup.
+    #b_list = [0.55, 0.9523, 1.1429, 2.2857]
+    b_list = [-7.5, -8, -9]
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
     for b in b_list:
         test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., b, rhs, material)
         database.add_test(test)
-    database.mirror()
+    # database.mirror()
     database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
@@ -118,7 +132,7 @@ if __name__ == "__main__":
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
-    configurations.optimize(x, order='Omega0', parallel=parallel)
+    configurations.optimize(x, order='Omega1_weights', parallel=parallel)
     configurations.compare_to_exact(x, material, parallel=parallel)
     configurations.sort('error')
     # configurations.plot(x, material, max_images=5)
@@ -158,7 +172,7 @@ if __name__ == "__main__":
     costH1Omega_w_points = axs[1, 1].scatter(results.rot1, results.rot2, c=results.J1Omega_w, lw=0)
     axs[1, 1].set_ylabel("Slope domain 1")
     axs[1, 1].set_xlabel("Slope domain 2")
-    fig.colorbar(costH1Omega_w_points, ax=axs[1, 1], label="$J^\Omega_(4,1)$")
+    fig.colorbar(costH1Omega_w_points, ax=axs[1, 1], label="$J^\Omega_w$")
 
     # Error points.
     error_points = axs[1, 2].scatter(results.rot1, results.rot2, c=results.error, lw=0)
@@ -168,12 +182,12 @@ if __name__ == "__main__":
 
     # Look at the convergence, compare distance to exact solution and overlapping error.
     plt.figure()
-    plt.xlabel("Cost $J$")
-    plt.ylabel("Distance to Exact Solution $e$")
+    plt.ylabel("Cost $J$")
+    plt.xlabel("Distance to Exact Solution $e$")
     plt.scatter(results.error, results.J0Omega, label='$J^\Omega_0$')
     plt.scatter(results.error, results.J1Omega, label='$J^\Omega_1$')
     plt.scatter(results.error, results.J0Gamma, label='$J^\Gamma_0$')
     plt.scatter(results.error, results.J1Gamma, label='$J^\Gamma_1$')
-    plt.scatter(results.error, results.J1Omega_w, label='$J^\Omega_{4,1}$')
+    plt.scatter(results.error, results.J1Omega_w, label='$J^\Omega_w$')
     plt.legend()
     plt.show()

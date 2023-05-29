@@ -158,7 +158,7 @@ if __name__ == "__main__":
     costH1Omega_w_points = axs[1, 1].scatter(results.rot1, results.rot2, c=results.J1Omega_w, lw=0)
     axs[1, 1].set_ylabel("Slope domain 1")
     axs[1, 1].set_xlabel("Slope domain 2")
-    fig.colorbar(costH1Omega_w_points, ax=axs[1, 1], label="$J^\Omega_(4,1)$")
+    fig.colorbar(costH1Omega_w_points, ax=axs[1, 1], label="$J^\Omega_w$")
 
     # Error points.
     error_points = axs[1, 2].scatter(results.rot1, results.rot2, c=results.error, lw=0)
@@ -174,6 +174,6 @@ if __name__ == "__main__":
     plt.scatter(results.error, results.J1Omega, label='$J^\Omega_1$')
     plt.scatter(results.error, results.J0Gamma, label='$J^\Gamma_0$')
     plt.scatter(results.error, results.J1Gamma, label='$J^\Gamma_1$')
-    plt.scatter(results.error, results.J1Omega_w, label='$J^\Omega_{4,1}$')
+    plt.scatter(results.error, results.J1Omega_w, label='$J^\Omega_w$')
     plt.legend()
     plt.show()
