@@ -117,17 +117,15 @@ if __name__ == "__main__":
     # Perform test according to the following test matrix.
     specimen_length = 1500.  # Specimen length in mm.
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(400, 600, 0.2)])  # rhs in test setup.
-    #b_list = [0.55, 0.9523, 1.1429, 2.2857]
-    b_list = [-15, -16, -17, -18, -19]
+    rhs = partial(rhs_hats, [(600, 800, 0.2)])  # rhs in test setup.
+    b_list = [0, -4.75, -9.5, -14.25]
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
     for b in b_list:
         test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., b, rhs, material)
         database.add_test(test)
-    # database.mirror()
-    # database.plot()
+    database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     x = np.linspace(0, problem_length, 1001)  # Spatial discretization in mm.
