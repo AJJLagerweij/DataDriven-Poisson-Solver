@@ -66,7 +66,7 @@ def rhs_hats(hats, x):
     return gx
 
 
-def export_results(configurations, domain_length, problem_length, material):
+def export_results(configurations, problem_length, material):
     results = pd.DataFrame(columns=['rot1', 'rot2', 'J0Omega', 'J1Omega', 'J0Gmega', 'J1Gmega', 'J1Omega_w', 'error'])
 
     for num, configuration in enumerate(configurations.database['configuration']):
@@ -75,12 +75,12 @@ def export_results(configurations, domain_length, problem_length, material):
     return results
 
 
-def configuration_details(configuration, domain_length, problem_length, material):
+def configuration_details(configuration, problem_length, material):
     # Calculate slope domain 1 and domain two.
-    up1 = configuration.patches[0].u
-    up2 = configuration.patches[1].u
-    rot1 = up1[-1] / domain_length
-    rot2 = up2[-1] / domain_length
+    patch1 = configuration.patches[0]
+    patch2 = configuration.patches[1]
+    rot1 = (patch1.u[10] - patch1.u[0]) / (patch1.x[10] - patch1.x[0])
+    rot2 = (patch2.u[10] - patch2.u[0]) / (patch2.x[10] - patch2.x[0])
 
     x = np.linspace(0, problem_length, 1001)
     J0Omega = configuration.error(x, order='Omega0')
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(400, 600, 0.2)])  # rhs in test setup.
     #b_list = [0.55, 0.9523, 1.1429, 2.2857]
-    b_list = [-10, -12, -14]
+    b_list = [-12, -14, -16, -18]
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., b, rhs, material)
         database.add_test(test)
     # database.mirror()
-    database.plot()
+    # database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     x = np.linspace(0, problem_length, 1001)  # Spatial discretization in mm.
