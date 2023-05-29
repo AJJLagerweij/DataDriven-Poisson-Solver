@@ -66,29 +66,31 @@ def rhs_hats(hats, x):
     return gx
 
 
-def export_results(configurations, domain_length, problem_length, material):
+def export_results(configurations, material):
     results = pd.DataFrame(columns=['rot1', 'rot2', 'J0Omega', 'J1Omega', 'J0Gmega', 'J1Gmega', 'J1Omega_w', 'error'])
 
     for num, configuration in enumerate(configurations.database['configuration']):
-        results = pd.concat([results, configuration_details(configuration, domain_length, problem_length, material)])
+        results = pd.concat([results, configuration_details(configuration, material)])
 
     return results
 
 
-def configuration_details(configuration, domain_length, problem_length, material):
+def configuration_details(configuration, material):
     # Calculate slope domain 1 and domain two.
-    up1 = configuration.patches[0].u
-    up2 = configuration.patches[1].u
-    rot1 = up1[-1] / domain_length
-    rot2 = up2[-1] / domain_length
+    x = np.linspace(0, configuration.problem.domain[-1], 1001)
+    ud = configuration.domain_primal(x)
+    rot1 = (ud[0, 10] - ud[0, 0]) / (x[10] - x[0])
+    rot2 = (ud[1, -10] - ud[1, -1]) / (x[-10] - x[-1])
 
-    x = np.linspace(0, problem_length, 1001)
+    # Calculate the cost and error functions.
     J0Omega = configuration.error(x, order='Omega0')
     J1Omega = configuration.error(x, order='Omega1')
     J0Gamma = configuration.error(x, order='Gamma0')
     J1Gamma = configuration.error(x, order='Gamma1')
     J1Omega_w = configuration.error(x, order='Omega1_weights')
     error = configuration.compare_to_exact(x, material)
+
+    # Store the results.
     results = pd.DataFrame({'rot1': [rot1], 'rot2': [rot2], 'J0Omega': [J0Omega], 'J1Omega': [J1Omega],
                             'J0Gamma': [J0Gamma], 'J1Gamma': [J1Gamma], 'J1Omega_w': [J1Omega_w], 'error': [error]})
     return results
@@ -117,7 +119,7 @@ if __name__ == "__main__":
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(400, 600, 0.2)])  # rhs in test setup.
     #b_list = [0.55, 0.9523, 1.1429, 2.2857]
-    b_list = [-10, -12, -14]
+    b_list = [-12, -14, -16, -18]
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
@@ -125,7 +127,7 @@ if __name__ == "__main__":
         test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., b, rhs, material)
         database.add_test(test)
     # database.mirror()
-    database.plot()
+    # database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     x = np.linspace(0, problem_length, 1001)  # Spatial discretization in mm.
@@ -138,7 +140,7 @@ if __name__ == "__main__":
     # configurations.plot(x, material, max_images=5)
 
     # plot and export results.
-    results = export_results(configurations, domain_length, problem_length, material)
+    results = export_results(configurations, material)
     results.to_csv('Scatter_cost_error.csv')
 
     # Plot the error pointss.
@@ -146,38 +148,38 @@ if __name__ == "__main__":
 
     # Cost J^Omega_0
     costH0Omega_points = axs[0, 0].scatter(results.rot1, results.rot2, c=results.J0Gamma, lw=0)
-    axs[0, 0].set_ylabel("Slope domain 1")
-    axs[0, 0].set_xlabel("Slope domain 2")
+    axs[0, 0].set_xlabel("Slope domain 1")
+    axs[0, 0].set_ylabel("Slope domain 2")
     fig.colorbar(costH0Omega_points, ax=axs[0, 0], label="$J^\Omega_0$")
 
     # Cost J^Omega_1
     costH1Omega_points = axs[0, 1].scatter(results.rot1, results.rot2, c=results.J1Omega, lw=0)
-    axs[0, 1].set_ylabel("Slope domain 1")
-    axs[0, 1].set_xlabel("Slope domain 2")
+    axs[0, 1].set_xlabel("Slope domain 1")
+    axs[0, 1].set_ylabel("Slope domain 2")
     fig.colorbar(costH1Omega_points, ax=axs[0, 1], label="$J^\Omega_1$")
 
     # Cost J^Gamma_0
     costH0Gamma_points = axs[0, 2].scatter(results.rot1, results.rot2, c=results.J0Gamma, lw=0)
-    axs[0, 2].set_ylabel("Slope domain 1")
-    axs[0, 2].set_xlabel("Slope domain 2")
+    axs[0, 2].set_xlabel("Slope domain 1")
+    axs[0, 2].set_ylabel("Slope domain 2")
     fig.colorbar(costH0Gamma_points, ax=axs[0, 2], label="$J^\Gamma_0")
 
     # Cost J^Gamma_1
     costH1Gamma_points = axs[1, 0].scatter(results.rot1, results.rot2, c=results.J1Gamma, lw=0)
-    axs[1, 0].set_ylabel("Slope domain 1")
-    axs[1, 0].set_xlabel("Slope domain 2")
+    axs[1, 0].set_xlabel("Slope domain 1")
+    axs[1, 0].set_ylabel("Slope domain 2")
     fig.colorbar(costH1Gamma_points, ax=axs[1, 0], label="$J^\Gamma_1$")
 
     # Cost J^Omega_1_weighted
     costH1Omega_w_points = axs[1, 1].scatter(results.rot1, results.rot2, c=results.J1Omega_w, lw=0)
-    axs[1, 1].set_ylabel("Slope domain 1")
-    axs[1, 1].set_xlabel("Slope domain 2")
+    axs[1, 1].set_xlabel("Slope domain 1")
+    axs[1, 1].set_ylabel("Slope domain 2")
     fig.colorbar(costH1Omega_w_points, ax=axs[1, 1], label="$J^\Omega_w$")
 
     # Error points.
     error_points = axs[1, 2].scatter(results.rot1, results.rot2, c=results.error, lw=0)
-    axs[1, 2].set_ylabel("Slope domain 1")
-    axs[1, 2].set_xlabel("Slope domain 2")
+    axs[1, 2].set_xlabel("Slope domain 1")
+    axs[1, 2].set_ylabel("Slope domain 2")
     fig.colorbar(error_points, ax=axs[1, 2], label="$Error to exact$")
 
     # Look at the convergence, compare distance to exact solution and overlapping error.
