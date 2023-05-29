@@ -119,7 +119,7 @@ if __name__ == "__main__":
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(400, 600, 0.2)])  # rhs in test setup.
     #b_list = [0.55, 0.9523, 1.1429, 2.2857]
-    b_list = [-12, -14, -16, -18]
+    b_list = [-15, -16, -17, -18, -19]
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
@@ -142,8 +142,9 @@ if __name__ == "__main__":
     # plot and export results.
     results = export_results(configurations, material)
     results.to_csv('Scatter_cost_error.csv')
+    print(results)
 
-    # Plot the error pointss.
+    # Plot the error points.
     fig, axs = plt.subplots(2, 3, layout="constrained", sharex=True, sharey=True)
 
     # Cost J^Omega_0
