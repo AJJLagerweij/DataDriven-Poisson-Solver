@@ -67,9 +67,9 @@ if __name__ == "__main__":
     material = LinearMaterial(1500)  # Constant conductivity in W mm / degC, this value will not change the result.
 
     # Perform test according to the following test matrix.
-    specimen_length = 1000  # Specimen length in mm.
+    specimen_length = 1500  # Specimen length in mm.
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(400, 600, problem_rhs)])  # rhs in test setup.
+    rhs = partial(rhs_hats, [(600, 800, problem_rhs)])  # rhs in test setup.
     test = Laplace_Dirichlet_Dirichlet(specimen_length, specimen_dx, 0., 0., rhs, material)
 
     # Create empty database and add test to it.
@@ -144,7 +144,7 @@ if __name__ == "__main__":
 
     # Create surface plots comparing cost vs error to exact.
     num = 11
-    lim = 4
+    lim = 9
     rotation_domain1 = np.linspace(-lim, 0, num=num)
     rotation_domain2 = np.linspace(0, lim, num=num)
     costJ0Omega = np.zeros((num, num))
@@ -166,7 +166,7 @@ if __name__ == "__main__":
             # Calculate the slope in the linear section of the domain.
             ud = configuration.domain_primal(x)
             rot1_grid[i, j] = (ud[0, 10] - ud[0, 0]) / (x[10] - x[0])
-            rot2_grid[i, j] = (ud[1, 10] - ud[1, 0]) / (x[10] - x[0])
+            rot2_grid[i, j] = (ud[1, -10] - ud[1, -1]) / (x[-10] - x[-1])
 
             # Calculate the cost and error functions.
             costJ0Omega[i, j] = configuration.error(x, order='Omega0')
