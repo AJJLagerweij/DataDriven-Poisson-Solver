@@ -46,7 +46,7 @@ import pandas as pd
 
 # Importing my own scripts.
 from configuration import ConfigurationDatabase
-from problem import Hat
+from problem import Hat, rhs_exact
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
 from constitutive import LinearMaterial, Hardening, Softening
@@ -115,11 +115,14 @@ if __name__ == "__main__":
     x = np.linspace(0, problem_length, 1001)
     dx = x[1] - x[0]
     material = LinearMaterial(1000)
+    x_exact, u_exact, rhs_exact = problem.exact(x, material)
+    dudx = np.diff(u_exact) / dx
+    material.plot(dudx)
 
     # Perform test according to the following test matrix.
     specimen_length = 1500.  # Specimen length in mm.
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
-    rhs = partial(rhs_hats, [(600, 800, 0.2)])  # rhs in test setup.
+    rhs = partial(rhs_hats, [(600, 800, problem_rhs)])  # rhs in test setup.
     b_list = list(range(-14, 1, 2))
     # b_list = list(range(-14, 1))
 
