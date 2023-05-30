@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # problem.plot()
 
     # Material definition, required for the test, and verification of the exact solution.
-    material = LinearMaterial(1500)  # Constant conductivity in W mm / degC, this value will not change the result.
+    material = LinearMaterial(1000)  # Constant conductivity in W mm / degC, this value will not change the result.
 
     # Perform test according to the following test matrix.
     specimen_length = 1500  # Specimen length in mm.
@@ -81,72 +81,71 @@ if __name__ == "__main__":
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     x = np.linspace(0, problem_length, 1001)  # Spatial discretization in mm.
 
-    # Bad initial guess, and verifying how J0Omega converges.
-    configuration = Configuration(problem, database)  # From patch admissibility.
-    configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
-    configuration.optimize(x, material=material, verbose=False, order='Omega0')
-    intermediate_J0Omega = np.array(configuration._intermediate_results)
-    intermediate_J0Omega = pd.DataFrame({'cost': intermediate_J0Omega[:, 0], 'error': intermediate_J0Omega[:, 1],
-                                         'rot1': intermediate_J0Omega[:, 3]/domain_length,
-                                         'rot2': intermediate_J0Omega[:, 4]/domain_length})
-    intermediate_J0Omega.to_csv("Intermediate_J0Omega.csv")
-
-    # Bad initial guess, and verifying how J1Omega converges.
-    configuration = Configuration(problem, database)  # From patch admissibility.
-    configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
-    configuration.optimize(x, material=material, verbose=False, order='Omega1')
-    intermediate_J1Omega = np.array(configuration._intermediate_results)
-    intermediate_J1Omega = pd.DataFrame({'cost': intermediate_J1Omega[:, 0], 'error': intermediate_J1Omega[:, 1],
-                                         'rot1': intermediate_J1Omega[:, 3]/domain_length,
-                                         'rot2': intermediate_J1Omega[:, 4]/domain_length})
-    intermediate_J1Omega.to_csv("Intermediate_J1Omega.csv")
-
-    # Bad initial guess, and verifying how J0Gamma converges.
-    configuration = Configuration(problem, database)  # From patch admissibility.
-    configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
-    configuration.optimize(x, material=material, verbose=False, order='Gamma0')
-    intermediate_J0Gamma = np.array(configuration._intermediate_results)
-    intermediate_J0Gamma = pd.DataFrame({'cost': intermediate_J0Gamma[:, 0], 'error': intermediate_J0Gamma[:, 1],
-                                         'rot1': intermediate_J0Gamma[:, 3]/domain_length,
-                                         'rot2': intermediate_J0Gamma[:, 4]/domain_length})
-    intermediate_J0Gamma.to_csv("Intermediate_J0Gamma.csv")
-
-    # Bad initial guess, and verifying how J1Gamma converges.
-    configuration = Configuration(problem, database)  # From patch admissibility.
-    configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
-    configuration.optimize(x, material=material, verbose=False, order='Gamma1')
-    intermediate_J1Gamma = np.array(configuration._intermediate_results)
-    intermediate_J1Gamma = pd.DataFrame({'cost': intermediate_J1Gamma[:, 0], 'error': intermediate_J1Gamma[:, 1],
-                                         'rot1': intermediate_J1Gamma[:, 3]/domain_length,
-                                         'rot2': intermediate_J1Gamma[:, 4]/domain_length})
-    intermediate_J1Gamma.to_csv("Intermediate_J1Gamma.csv")
-
-    # Bad initial guess, and verifying how J1Omega_weighted converges.
-    configuration = Configuration(problem, database)  # From patch admissibility.
-    configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
-    configuration.optimize(x, material=material, verbose=False, order='Omega1_weights')
-    intermediate_J1Omega_w = np.array(configuration._intermediate_results)
-    intermediate_J1Omega_w = pd.DataFrame({'cost': intermediate_J1Omega_w[:, 0], 'error': intermediate_J1Omega_w[:, 1],
-                                           'rot1': intermediate_J1Omega_w[:, 3]/domain_length,
-                                           'rot2': intermediate_J1Omega_w[:, 4]/domain_length})
-    intermediate_J1Omega_w.to_csv("Intermediate_J1Omega_weights.csv")
-
-    # Plot convergence of Cost vs Error.
-    fig = plt.figure()
-    plt.loglog(intermediate_J0Omega['error'], intermediate_J0Omega['cost'], 's:', label=' $J^\Omega_0$', color='C1')
-    plt.loglog(intermediate_J1Omega['error'], intermediate_J1Omega['cost'], 's:', label=' $J^\Omega_1$', color='C2')
-    plt.loglog(intermediate_J0Gamma['error'], intermediate_J0Gamma['cost'], 's:', label=' $J^\Gamma_0$', color='C3')
-    plt.loglog(intermediate_J1Gamma['error'], intermediate_J1Gamma['cost'], 's:', label=' $J^\Gamma_1$', color='C4')
-    plt.loglog(intermediate_J1Omega_w['error'], intermediate_J1Omega_w['cost'], 's:', label=' $J^\Omega_w$', color='C5')
-    plt.legend(loc='upper left', frameon=True)
-    plt.xlabel('Error to Exact')
-    plt.ylabel('Cost')
+    # # Bad initial guess, and verifying how J0Omega converges.
+    # configuration = Configuration(problem, database)  # From patch admissibility.
+    # configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
+    # configuration.optimize(x, material=material, verbose=False, order='Omega0')
+    # intermediate_J0Omega = np.array(configuration._intermediate_results)
+    # intermediate_J0Omega = pd.DataFrame({'cost': intermediate_J0Omega[:, 0], 'error': intermediate_J0Omega[:, 1],
+    #                                      'rot1': intermediate_J0Omega[:, 3]/domain_length,
+    #                                      'rot2': intermediate_J0Omega[:, 4]/domain_length})
+    # intermediate_J0Omega.to_csv("Intermediate_J0Omega.csv")
+    #
+    # # Bad initial guess, and verifying how J1Omega converges.
+    # configuration = Configuration(problem, database)  # From patch admissibility.
+    # configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
+    # configuration.optimize(x, material=material, verbose=False, order='Omega1')
+    # intermediate_J1Omega = np.array(configuration._intermediate_results)
+    # intermediate_J1Omega = pd.DataFrame({'cost': intermediate_J1Omega[:, 0], 'error': intermediate_J1Omega[:, 1],
+    #                                      'rot1': intermediate_J1Omega[:, 3]/domain_length,
+    #                                      'rot2': intermediate_J1Omega[:, 4]/domain_length})
+    # intermediate_J1Omega.to_csv("Intermediate_J1Omega.csv")
+    #
+    # # Bad initial guess, and verifying how J0Gamma converges.
+    # configuration = Configuration(problem, database)  # From patch admissibility.
+    # configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
+    # configuration.optimize(x, material=material, verbose=False, order='Gamma0')
+    # intermediate_J0Gamma = np.array(configuration._intermediate_results)
+    # intermediate_J0Gamma = pd.DataFrame({'cost': intermediate_J0Gamma[:, 0], 'error': intermediate_J0Gamma[:, 1],
+    #                                      'rot1': intermediate_J0Gamma[:, 3]/domain_length,
+    #                                      'rot2': intermediate_J0Gamma[:, 4]/domain_length})
+    # intermediate_J0Gamma.to_csv("Intermediate_J0Gamma.csv")
+    #
+    # # Bad initial guess, and verifying how J1Gamma converges.
+    # configuration = Configuration(problem, database)  # From patch admissibility.
+    # configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
+    # configuration.optimize(x, material=material, verbose=False, order='Gamma1')
+    # intermediate_J1Gamma = np.array(configuration._intermediate_results)
+    # intermediate_J1Gamma = pd.DataFrame({'cost': intermediate_J1Gamma[:, 0], 'error': intermediate_J1Gamma[:, 1],
+    #                                      'rot1': intermediate_J1Gamma[:, 3]/domain_length,
+    #                                      'rot2': intermediate_J1Gamma[:, 4]/domain_length})
+    # intermediate_J1Gamma.to_csv("Intermediate_J1Gamma.csv")
+    #
+    # # Bad initial guess, and verifying how J1Omega_weighted converges.
+    # configuration = Configuration(problem, database)  # From patch admissibility.
+    # configuration.rbd = np.array([[0, -1.2], [1.199, 0]])  # Create bad initial guess.
+    # configuration.optimize(x, material=material, verbose=False, order='Omega1_weights')
+    # intermediate_J1Omega_w = np.array(configuration._intermediate_results)
+    # intermediate_J1Omega_w = pd.DataFrame({'cost': intermediate_J1Omega_w[:, 0], 'error': intermediate_J1Omega_w[:, 1],
+    #                                        'rot1': intermediate_J1Omega_w[:, 3]/domain_length,
+    #                                        'rot2': intermediate_J1Omega_w[:, 4]/domain_length})
+    # intermediate_J1Omega_w.to_csv("Intermediate_J1Omega_weights.csv")
+    #
+    # # Plot convergence of Cost vs Error.
+    # fig = plt.figure()
+    # plt.loglog(intermediate_J0Omega['error'], intermediate_J0Omega['cost'], 's:', label=' $J^\Omega_0$', color='C1')
+    # plt.loglog(intermediate_J1Omega['error'], intermediate_J1Omega['cost'], 's:', label=' $J^\Omega_1$', color='C2')
+    # plt.loglog(intermediate_J0Gamma['error'], intermediate_J0Gamma['cost'], 's:', label=' $J^\Gamma_0$', color='C3')
+    # plt.loglog(intermediate_J1Gamma['error'], intermediate_J1Gamma['cost'], 's:', label=' $J^\Gamma_1$', color='C4')
+    # plt.loglog(intermediate_J1Omega_w['error'], intermediate_J1Omega_w['cost'], 's:', label=' $J^\Omega_w$', color='C5')
+    # plt.legend(loc='upper left', frameon=True)
+    # plt.xlabel('Error to Exact')
+    # plt.ylabel('Cost')
 
     # Create surface plots comparing cost vs error to exact.
-    num = 41
-    lim = 9
-    rotation_domain1 = np.linspace(-lim, 0, num=num)
-    rotation_domain2 = np.linspace(0, lim, num=num)
+    num = 5
+    rotation_domain1 = np.linspace(1.5, -4.6, num=num)
+    rotation_domain2 = np.linspace(-1, 7.5, num=num)
     costJ0Omega = np.zeros((num, num))
     costJ1Omega = np.zeros((num, num))
     costJ0Gamma = np.zeros((num, num))
@@ -181,43 +180,43 @@ if __name__ == "__main__":
 
     # Cost J^Omega_0
     costH0Omega_surface = axs[0, 0].contourf(rotation_domain1, rotation_domain2, costJ0Omega)
-    axs[0, 0].set_ylabel("Slope domain 1")
-    axs[0, 0].set_xlabel("Slope domain 2")
+    axs[0, 0].set_xlabel("Slope domain 1")
+    axs[0, 0].set_ylabel("Slope domain 2")
     fig.colorbar(costH0Omega_surface, ax=axs[0, 0], label="$J^\Omega_0$")
     # axs[0, 0].plot(intermediate_J0Omega['rot1'], intermediate_J0Omega['rot2'], 's:', color='C1')
 
     # Cost J^Omega_1
     costH1Omega_surface = axs[0, 1].contourf(rotation_domain1, rotation_domain2, costJ1Omega)
-    axs[0, 1].set_ylabel("Slope domain 1")
-    axs[0, 1].set_xlabel("Slope domain 2")
+    axs[0, 1].set_xlabel("Slope domain 1")
+    axs[0, 1].set_ylabel("Slope domain 2")
     fig.colorbar(costH1Omega_surface, ax=axs[0, 1], label="$J^\Omega_1$")
     # axs[0, 1].plot(intermediate_J1Omega['rot1'], intermediate_J1Omega['rot2'], 's:', color='C2')
 
     # Cost J^Gamma_0
     costH0Gamma_surface = axs[0, 2].contourf(rotation_domain1, rotation_domain2, costJ0Gamma)
-    axs[0, 2].set_ylabel("Slope domain 1")
-    axs[0, 2].set_xlabel("Slope domain 2")
+    axs[0, 2].set_xlabel("Slope domain 1")
+    axs[0, 2].set_ylabel("Slope domain 2")
     fig.colorbar(costH0Gamma_surface, ax=axs[0, 2], label="$J^\Gamma_0")
     # axs[0, 2].plot(intermediate_J0Gamma['rot1'], intermediate_J0Gamma['rot2'], 's:', color='C3')
 
     # Cost J^Gamma_1
     costH1Gamma_surface = axs[1, 0].contourf(rotation_domain1, rotation_domain2, costJ1Gamma)
-    axs[1, 0].set_ylabel("Slope domain 1")
-    axs[1, 0].set_xlabel("Slope domain 2")
+    axs[1, 0].set_xlabel("Slope domain 1")
+    axs[1, 0].set_ylabel("Slope domain 2")
     fig.colorbar(costH1Gamma_surface, ax=axs[1, 0], label="$J^\Gamma_1$")
     # axs[1, 0].plot(intermediate_J1Gamma['rot1'], intermediate_J1Gamma['rot2'], 's:', color='C4')
 
     # Cost J^Omega_1_weighted
     costH1Omega_w_surface = axs[1, 1].contourf(rotation_domain1, rotation_domain2, costJ1Omega_w)
-    axs[1, 1].set_ylabel("Slope domain 1")
-    axs[1, 1].set_xlabel("Slope domain 2")
+    axs[1, 1].set_xlabel("Slope domain 1")
+    axs[1, 1].set_ylabel("Slope domain 2")
     fig.colorbar(costH1Omega_w_surface, ax=axs[1, 1], label="$J^\Omega_w$")
     # axs[1, 1].plot(intermediate_J1Omega_w['rot1'], intermediate_J1Omega_w['rot2'], 's:', color='C5')
 
     # Error surface.
     error_surface = axs[1, 2].contourf(rotation_domain1, rotation_domain2, error)
-    axs[1, 2].set_ylabel("Slope domain 1")
-    axs[1, 2].set_xlabel("Slope domain 2")
+    axs[1, 2].set_xlabel("Slope domain 1")
+    axs[1, 2].set_ylabel("Slope domain 2")
     fig.colorbar(error_surface, ax=axs[1, 2], label="Error to Exact")
 
     # Store the surface plots.
