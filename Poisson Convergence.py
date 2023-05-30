@@ -143,7 +143,7 @@ if __name__ == "__main__":
     plt.ylabel('Cost')
 
     # Create surface plots comparing cost vs error to exact.
-    num = 11
+    num = 41
     lim = 9
     rotation_domain1 = np.linspace(-lim, 0, num=num)
     rotation_domain2 = np.linspace(0, lim, num=num)
