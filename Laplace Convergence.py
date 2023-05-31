@@ -4,17 +4,15 @@ Comparing minimization cost function and error to exact solution for validation.
 The problem solved is the generic Poisson equation:
 
 .. math::
-    1 \nabla^2 u = 0 \quad 0 \leq x \leq 1000\\
+    1 \nabla^2 u = 0 \quad 0 \leq x \leq 1\\
 
-    u(0) = 0\\
+    u(0) = 0 \quad u(1) = 0
 
-    u(1) = 0
-
-Now the objective of this script is to compare the cost function to the quality of the solution. Whith quality of the
+Now the objective of this script is to compare the cost function to the quality of the solution. With quality of the
 solution we mean:
 
 .. math::
-     e = \sum_{d=0}^D H^0(u_d^\text{sim}-u^\text{exact})
+     e = \sum_{d=0}^D \int_{\Omega_d} (u_d-u^\text{exact})^2 dx
 
 Bram van der Heijden
 Mechanics of Composites for Energy and Mobility
