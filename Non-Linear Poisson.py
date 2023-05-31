@@ -45,7 +45,7 @@ import pandas as pd
 
 # Importing my own scripts.
 from configuration import ConfigurationDatabase
-from problem import Hat
+from problem import Hat, rhs_exact
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
 from constitutive import LinearMaterial
