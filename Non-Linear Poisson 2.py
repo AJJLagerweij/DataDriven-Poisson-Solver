@@ -1,18 +1,16 @@
 r"""
-The Laplace example.
+The Poisson example.
+
+The problem solved is the non-linear Laplace equation:
 
 The problem solved is the non-linear Laplace equation:
 
 .. math::
-    \div( K [\nabla u]) = 0 \quad 0 \leq x \leq 1000\\
+    \div( K [\nabla u]) = g(x) \quad 0 \leq x \leq 1000\\
 
-    u(0) = 0\\
+    u(0) = 0 \quad u(1000) = 0
 
-    u(1000) = 0
-
-which in this case has a linear conductivity :math:`K=1\nabla u`, and could be solved with the linear non-homogeneous
-solver available in the ODE solver branch of this git. Nevertheless, here it is assumed that the conductivity is not a
-constant, and that it is not known that the actual material is linear.
+which in this case has a highly non-linear conductivity, and can only be solved with this generic non-linear solver.
 
 Our dataset does not contain the solution to this problem. However, it contains the solution for a similar particular
 solution. With Frankenstein's algorithm, we cut the solution in the database in parts and reassemble it. According to
@@ -21,7 +19,7 @@ appendix A of the dissertation, the following solutions for the domain should be
 .. math::
     u_d(x) = u_{p_d}(x-t_{d}) + \bar{u}_d
 
-where :math:`b_d` is an unknown constant. And :math:`u_{p_d}(x)` is the displacement of a patch that satisfies:
+where :math:`\bar{u}_d` is an unknown constant. And :math:`u_{p_d}(x)` is the displacement of a patch that satisfies:
 
 .. math::
     g_{p_d}(x-t_{d}) = \tilde{g}(x) \quad \forall x\in\mathcal{D}_d
@@ -117,17 +115,19 @@ if __name__ == "__main__":
     x_exact_lin, u_exact_lin, rhs_exact_lin = problem.exact(x, material)
     dudx_lin = np.diff(u_exact_lin) / dx
     material.plot(dudx_lin)
-    # material = Hardening(2e6, 1000)  # Constant conductivity in W mm / degC
     material = Softening(2e-6, 1/1000)
     x_exact, u_exact, rhs_exact = problem.exact(x, material)
     dudx = np.diff(u_exact) / dx
+    conductivity = material.field_to_potential(dudx)
     material.plot(dudx)
+    material_data = pd.DataFrame({'dudx': dudx, 'conductivity': conductivity})
+    material_data.to_csv('MaterialData.csv')
 
     # Perform test according to the following test matrix.
     specimen_length = 1500.  # Specimen length in mm.
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(600, 800, 0.2)])  # rhs in test setup.
-    b_list = list(range(-14, 1))
+    b_list = list(range(-20, 5))
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()

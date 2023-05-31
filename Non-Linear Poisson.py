@@ -1,18 +1,16 @@
 r"""
-The Laplace example.
+The Poisson example.
 
 The problem solved is the non-linear Laplace equation:
 
 .. math::
-    \div( K [\nabla u]) = 0 \quad 0 \leq x \leq 1000\\
+    \div( K [\nabla u]) = g(x) \quad 0 \leq x \leq 1000\\
 
-    u(0) = 0\\
-
-    u(1000) = 0
+    u(0) = 0 \quad u(1000) = 0
 
 which in this case has a linear conductivity :math:`K=1\nabla u`, and could be solved with the linear non-homogeneous
-solver available in the ODE solver branch of this git. Nevertheless, here it is assumed that the conductivity is not a
-constant, and that it is not known that the actual material is linear.
+solver available in the ODE solver branch of this git. Nevertheless, here it is assumed that the conductivity might not
+be constant, and that it is not known that the actual material is linear.
 
 Our dataset does not contain the solution to this problem. However, it contains the solution for a similar particular
 solution. With Frankenstein's algorithm, we cut the solution in the database in parts and reassemble it. According to
@@ -21,7 +19,7 @@ appendix A of the dissertation, the following solutions for the domain should be
 .. math::
     u_d(x) = u_{p_d}(x-t_{d}) + \bar{u}_d
 
-where :math:`b_d` is an unknown constant. And :math:`u_{p_d}(x)` is the displacement of a patch that satisfies:
+where :math:`\bar{u}_d` is an unknown constant. And :math:`u_{p_d}(x)` is the displacement of a patch that satisfies:
 
 .. math::
     g_{p_d}(x-t_{d}) = \tilde{g}(x) \quad \forall x\in\mathcal{D}_d
@@ -108,7 +106,6 @@ if __name__ == "__main__":
     domain_num = 2  # Amount subdomains.
     domain_length = 525  # Length of the subdomains in mm.
     problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
-    # problem.plot()
 
     # Material definition, required for the test, and verification of the exact solution.
     x = np.linspace(0, problem_length, 1001)
@@ -122,8 +119,7 @@ if __name__ == "__main__":
     specimen_length = 1500.  # Specimen length in mm.
     specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
     rhs = partial(rhs_hats, [(600, 800, problem_rhs)])  # rhs in test setup.
-    b_list = list(range(-14, 1, 2))
-    # b_list = list(range(-14, 1))
+    b_list = list(range(-14, 1))
 
     # Create patch database by looping over all tests.
     database = PatchDatabase()
@@ -140,7 +136,6 @@ if __name__ == "__main__":
     configurations.optimize(x, order='Omega1_weights', parallel=parallel)
     configurations.compare_to_exact(x, material, parallel=parallel)
     configurations.sort('error')
-    # configurations.plot(x, material, max_images=5)
 
     # plot and export results.
     results = export_results(configurations, material)
