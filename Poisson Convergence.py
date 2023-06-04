@@ -175,11 +175,11 @@ if __name__ == "__main__":
             rot2_grid[i, j] = (ud[1, -10] - ud[1, -1]) / (x[-10] - x[-1])
 
             # Calculate the cost and error functions.
-            costJ0Omega[i, j] = configuration.error(x, order='Omega0')
-            costJ1Omega[i, j] = configuration.error(x, order='Omega1')
-            costJ0Gamma[i, j] = configuration.error(x, order='Gamma0')
-            costJ1Gamma[i, j] = configuration.error(x, order='Gamma1')
-            costJ1Omega_w[i, j] = configuration.error(x, order='Omega1_weights')
+            costJ0Omega[i, j] = configuration.cost(x, order='Omega0')
+            costJ1Omega[i, j] = configuration.cost(x, order='Omega1')
+            costJ0Gamma[i, j] = configuration.cost(x, order='Gamma0')
+            costJ1Gamma[i, j] = configuration.cost(x, order='Gamma1')
+            costJ1Omega_w[i, j] = configuration.cost(x, order='Omega1_weights')
             error[i, j] = configuration.compare_to_exact(x, material)
 
     # Plot the error surfaces.

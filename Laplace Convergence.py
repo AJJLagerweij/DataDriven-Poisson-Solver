@@ -69,13 +69,13 @@ if __name__ == "__main__":
     configuration = Configuration(problem, database)
     configuration.rbd = np.array([[0, -0.6], [0.6, 0]])  # Small cost, far away from the solution.
     configuration.plot(x, material=material)
-    cost1 = configuration.error(x, order='Omega0')
+    cost1 = configuration.cost(x, order='Omega0')
     error1 = configuration.compare_to_exact(x, material)
     ud1 = configuration.domain_primal(x)
 
     configuration.rbd = np.array([[0, -0.5], [-0.5, 0]])  # Large cost, closer to the solution.
     configuration.plot(x, material=material)
-    cost2 = configuration.error(x, order='Omega0')
+    cost2 = configuration.cost(x, order='Omega0')
     error2 = configuration.compare_to_exact(x, material)
     ud2 = configuration.domain_primal(x)
 
@@ -92,13 +92,13 @@ if __name__ == "__main__":
     configuration = Configuration(problem, database)
     configuration.rbd = np.array([[0, -0.5], [0.5, 0]])  # Small cost, far away from the solution.
     configuration.plot(x, material=material)
-    cost1 = configuration.error(x, order='Omega1')
+    cost1 = configuration.cost(x, order='Omega1')
     error1 = configuration.compare_to_exact(x, material)
     ud1 = configuration.domain_primal(x)
 
     configuration.rbd = np.array([[0, -0.6], [-0.6, 0]])  # Large cost, closer to the solution.
     configuration.plot(x, material=material)
-    cost2 = configuration.error(x, order='Omega1')
+    cost2 = configuration.cost(x, order='Omega1')
     error2 = configuration.compare_to_exact(x, material)
     ud2 = configuration.domain_primal(x)
 
@@ -189,11 +189,11 @@ if __name__ == "__main__":
         for j, rot2 in enumerate(rotation_domain2):
             configuration = Configuration(problem, database)
             configuration.rbd = np.array([[0, rot1], [rot2, 0]])
-            costJ0Omega[i, j] = configuration.error(x, order='Omega0')
-            costJ1Omega[i, j] = configuration.error(x, order='Omega1')
-            costJ0Gamma[i, j] = configuration.error(x, order='Gamma0')
-            costJ1Gamma[i, j] = configuration.error(x, order='Gamma1')
-            costJ1Omega_w[i, j] = configuration.error(x, order='Omega1_weights')
+            costJ0Omega[i, j] = configuration.cost(x, order='Omega0')
+            costJ1Omega[i, j] = configuration.cost(x, order='Omega1')
+            costJ0Gamma[i, j] = configuration.cost(x, order='Gamma0')
+            costJ1Gamma[i, j] = configuration.cost(x, order='Gamma1')
+            costJ1Omega_w[i, j] = configuration.cost(x, order='Omega1_weights')
             error[i, j] = configuration.compare_to_exact(x, material)
 
     rotation_domain1 = rotation_domain1 / domain_length
