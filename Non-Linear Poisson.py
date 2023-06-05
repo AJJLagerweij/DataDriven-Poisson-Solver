@@ -64,7 +64,7 @@ def rhs_hats(hats, x):
 
 
 def export_results(configurations, material):
-    results = pd.DataFrame(columns=['rot1', 'rot2', 'J0Omega', 'J1Omega', 'J0Gmega', 'J1Gmega', 'J1Omega_w', 'error'])
+    results = pd.DataFrame(columns=['rot1', 'rot2', 'J0Omega', 'J1Omega', 'J0Gamma', 'J1Gamma', 'J1Omega_w', 'error'])
 
     for num, configuration in enumerate(configurations.database['configuration']):
         results = pd.concat([results, configuration_details(configuration, material)])
@@ -80,11 +80,11 @@ def configuration_details(configuration, material):
     rot2 = (ud[1, -10] - ud[1, -1]) / (x[-10] - x[-1])
 
     # Calculate the cost and error functions.
-    J0Omega = configuration.error(x, order='Omega0')
-    J1Omega = configuration.error(x, order='Omega1')
-    J0Gamma = configuration.error(x, order='Gamma0')
-    J1Gamma = configuration.error(x, order='Gamma1')
-    J1Omega_w = configuration.error(x, order='Omega1_weights')
+    J0Omega = configuration.cost(x, order='Omega0')
+    J1Omega = configuration.cost(x, order='Omega1')
+    J0Gamma = configuration.cost(x, order='Gamma0')
+    J1Gamma = configuration.cost(x, order='Gamma1')
+    J1Omega_w = configuration.cost(x, order='Omega1_weights')
     error = configuration.compare_to_exact(x, material)
 
     # Store the results.

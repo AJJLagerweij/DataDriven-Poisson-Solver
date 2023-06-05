@@ -246,9 +246,9 @@ class Configuration(object):
             rhs_domains[d, index] = u_d(x[index])
         return rhs_domains
 
-    def error(self, x, order='Omega1'):
+    def cost(self, x, order='Omega1'):
         r"""
-        Calculate the least square domain decomposition error.
+        Calculate the least square domain decomposition cost.
 
         The error represents how wel the primal fields in the overlapping areas match. The lower the error the
         more the primal fields in the overlapping areas agree with each other.
@@ -318,8 +318,8 @@ class Configuration(object):
                             if order == 'Omega1_weights':
                                 o = (overlap_end-overlap_start)
                                 L = self.problem._length
-                                A = 1 #/ (o * L**2)
-                                B = (3*L**2 - o**2) / 12  # (o*L**2)
+                                A = ((L + o) ** 3) / (12 * o * L ** 2)
+                                B = A * (L ** 2 / 4 - o ** 2 / 12)
                                 local_error = A * u_gap(x[index])**2 + B * du_gap(x[index])**2
                                 local_error = InterpolatedUnivariateSpline(x[index], local_error, k=3)
                                 error += 0.5 * local_error.integral(overlap_start, overlap_end)
@@ -361,7 +361,7 @@ class Configuration(object):
         self.translation = translation
 
         # Calculate error norm.
-        error = self.error(x, order=order)
+        error = self.cost(x, order=order)
         return error
 
     def _store_intermediate(self, x, material, params, order=None):
@@ -391,7 +391,7 @@ class Configuration(object):
         self.translation = translation
 
         # Calculate error norm, and the distance to the exact solution for each subdomain.
-        error = self.error(x, order=order)
+        error = self.cost(x, order=order)
         ed = self.compare_to_exact(x, material)
         self._intermediate_results.append(np.hstack(([error, ed], rbd.flatten())))
 
@@ -476,9 +476,9 @@ class Configuration(object):
 
         # Calculate the value of the cost function, and format it in a string for display purposes.
         # Calculate the value of the cost function, and format it in a string for display purposes.
-        result = _m(rf"$J^\Omega_0={self.error(x, order='Omega0'):4.2e}$" + "\n" +
-                    rf"$J^\Omega_1={self.error(x, order='Omega1'):4.2e}$" + "\n" +
-                    rf"$J^\Gamma_1={self.error(x, order='Gamma1'):4.2e}$" + "\n" +
+        result = _m(rf"$J^\Omega_0={self.cost(x, order='Omega0') :4.2e}$" + "\n" +
+                    rf"$J^\Omega_1={self.cost(x, order='Omega1') :4.2e}$" + "\n" +
+                    rf"$J^\Gamma_1={self.cost(x, order='Gamma1') :4.2e}$" + "\n" +
                     rf"$e={self.compare_to_exact(x, material):4.2e}$")
 
         # Get the reference solution and plot it.
@@ -547,7 +547,7 @@ class Configuration(object):
             u_gap_spline = InterpolatedUnivariateSpline(x_exact[index], u_gap, k=3)
 
             # Compute the error.
-            error += (u_gap_spline.integral(start, end))
+            error += 0.5*(u_gap_spline.integral(start, end))
 
         return error
 
@@ -723,7 +723,7 @@ class ConfigurationDatabase(object):
         if self.num_configurations() == 0:
             raise ValueError("There are no configurations in this database.")
         else:
-            print(f"Minimizing the error equation for {self.num_configurations()} configurations.")
+            print(f"Minimizing the cost function for {self.num_configurations()} configurations.")
             if parallel:
                 self._launch_multiprocessor_pool()
 
@@ -735,9 +735,9 @@ class ConfigurationDatabase(object):
                 self.database[['configuration', 'error', 'translation',
                                'success']] = self.database.configuration.apply(function)
 
-    def error(self, x, order=None, parallel=False):
+    def cost(self, x, order=None, parallel=False):
         r"""
-        Apply the error calculation function to all configurations considered and sort based upon it.
+        Apply the cost calculation function to all configurations considered and sort based upon it.
 
         .. warning:: Changes the object in place, a column with the error magnitude will be added to the database.
 
@@ -758,14 +758,14 @@ class ConfigurationDatabase(object):
         # Create partial optimization function that contains all fixed information.
         def function(config):
             """The wrapper around the :py:meth:`Configuration.error` function."""
-            error = config.error(x, order=order)
+            error = config.cost(x, order=order)
             return error
 
         # Apply the optimization function to all configurations.
         if self.num_configurations() == 0:
             raise ValueError("There are no configurations in this database.")
         else:
-            print(f"Computing the DD Error for {self.num_configurations()} configurations.")
+            print(f"Computing the DD Cost for {self.num_configurations()} configurations.")
             if parallel:
                 self._launch_multiprocessor_pool()
 

@@ -55,30 +55,32 @@ from constitutive import LinearMaterial
 plt.close('all')
 
 
-def export_results(configurations, domain_length, problem_length, material):
-    results = pd.DataFrame(columns=['rot1', 'rot2', 'J0Omega', 'J1Omega', 'J0Gmega', 'J1Gmega', 'J1Omega_w', 'error'])
+def export_results(configurations, material):
+    results = pd.DataFrame(columns=['rot1', 'rot2', 'J0Omega', 'J1Omega', 'J0Gamma', 'J1Gamma', 'J1Omega_w', 'error'])
 
     for num, configuration in enumerate(configurations.database['configuration']):
-        results = pd.concat([results, configuration_details(configuration, domain_length, problem_length, material)])
+        results = pd.concat([results, configuration_details(configuration, material)])
 
     return results
 
 
-def configuration_details(configuration, domain_length, problem_length, material):
+def configuration_details(configuration, material):
     # Calculate slope domain 1 and domain two.
-    x = np.array([domain_length, problem_length - domain_length])
+    x = np.linspace(0, configuration.problem.domain[-1], 1001)
     ud = configuration.domain_primal(x)
-    slope1 = ud[0, 0]/domain_length
-    slope2 = -ud[1, 1]/domain_length
+    rot1 = (ud[0, 10] - ud[0, 0]) / (x[10] - x[0])
+    rot2 = (ud[1, -10] - ud[1, -1]) / (x[-10] - x[-1])
 
-    x = np.linspace(0, problem_length, 1001)
-    J0Omega = configuration.error(x, order='Omega0')
-    J1Omega = configuration.error(x, order='Omega1')
-    J0Gamma = configuration.error(x, order='Gamma0')
-    J1Gamma = configuration.error(x, order='Gamma1')
-    J1Omega_w = configuration.error(x, order='Omega1_weights')
+    # Calculate the cost and error functions.
+    J0Omega = configuration.cost(x, order='Omega0')
+    J1Omega = configuration.cost(x, order='Omega1')
+    J0Gamma = configuration.cost(x, order='Gamma0')
+    J1Gamma = configuration.cost(x, order='Gamma1')
+    J1Omega_w = configuration.cost(x, order='Omega1_weights')
     error = configuration.compare_to_exact(x, material)
-    results = pd.DataFrame({'rot1': [slope1], 'rot2': [slope2], 'J0Omega': [J0Omega], 'J1Omega': [J1Omega],
+
+    # Store the results.
+    results = pd.DataFrame({'rot1': [rot1], 'rot2': [rot2], 'J0Omega': [J0Omega], 'J1Omega': [J1Omega],
                             'J0Gamma': [J0Gamma], 'J1Gamma': [J1Gamma], 'J1Omega_w': [J1Omega_w], 'error': [error]})
     return results
 
@@ -122,7 +124,7 @@ if __name__ == "__main__":
     configurations.sort('error')
 
     # plot and export results.
-    results = export_results(configurations, domain_length, problem_length, material)
+    results = export_results(configurations, material)
     results.to_csv('Scatter_cost_error.csv')
 
     # Plot the error points.
@@ -175,3 +177,11 @@ if __name__ == "__main__":
     plt.scatter(results.error, results.J1Omega_w, label='$J^\Omega_w$')
     plt.legend()
     plt.show()
+
+    # Store the database as an output.
+    database_output = {}
+    for p, patch in enumerate(database.database):
+        database_output[f'x{p}'] = patch.x
+        database_output[f'u{p}'] = patch.u
+    database_output = pd.DataFrame(database_output)
+    database_output.to_csv('Database.csv')
