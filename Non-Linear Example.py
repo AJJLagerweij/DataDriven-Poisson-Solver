@@ -55,15 +55,13 @@ from functools import partial
 
 # Importing my own scripts.
 from configuration import ConfigurationDatabase
-from problem import Hat, Homogeneous
+from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
-from constitutive import LinearMaterial, Softening
+from constitutive import LinearMaterial, Hardening
 
 # Setup basic plotting properties.
 plt.close('all')
-plt.rcParams['svg.fonttype'] = 'none'
-plt.rcParams['backend'] = 'Qt5agg'
 
 
 def rhs_hats(hats, x):
@@ -84,16 +82,15 @@ if __name__ == "__main__":
     # Problem definition.
     problem_length = 1000.  # Length of the problem in mm.
     problem_h = 200.  # Width of the hat function in mm.
-    problem_rhs = 0.0  # Right hand side heating in W / mm.
-    problem_a = 0.  # Left boundary value in degreeC.
+    problem_rhs = 0.2  # Right hand side heating in W / mm.
+    problem_a = 0.00  # Left boundary value in degreeC.
     problem_b = -5.  # Right boundary value in degreeC.
     domain_num = 4  # 16 # Amount subdomains.
     domain_length = 287.5  # 109.375 # Length of the subdomains in mm.
     problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
-    # problem.plot()
 
-    # Material definition.
-    material = LinearMaterial(1000)  # Constant conductivity in W mm / degC
+    # Material definition, required for the test, and verification of the exact solution.
+    material = Hardening(2e6, 1000)  # Hardening relation between temperature gradient and heat flux.
 
     # Create empty database.
     database = PatchDatabase()
@@ -125,7 +122,7 @@ if __name__ == "__main__":
 
     # Plot the resulting database, if required one can rotate or mirror here.
     print("\nNumber of patches", database.num_patches())
-    # database.plot()
+    database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
     name = f'Homogeneous-Simulation d {domain_num} p {database.num_patches()}'
@@ -137,38 +134,37 @@ if __name__ == "__main__":
 
     # Perform calculations on the database.
     print(f'{configurations.num_configurations()} are in this database')
-    configurations.optimize(x, order='Omega1_weights', parallel=parallel)
+    configurations.optimize(x, order='Omega1', parallel=parallel)
     configurations.compare_to_exact(x, material, parallel=parallel)
-    configurations.database.plot.scatter('error', 'error_to_exact')
+    configurations.database.plot.scatter('cost', 'error_to_exact')
     configurations.save(f'{name}.pkl.gz')
+
+    # Get the best configuration in DD-cost.
+    configurations.sort('cost')
+    config = configurations.database.iloc[0, 0]
+    config.plot(x, material=material)
+
+    # Storing the solution.
+    config = configurations.database.iloc[0, 0]
+    x = np.linspace(0, problem_length, 1001)
+    print('e= ', config.cost(x))
+    u = config.domain_primal(x)
+    rhs = config.domain_rhs(x)
+    collection = {'x': x}
+    for d in range(domain_num):
+        collection[f"u{d + 1}"] = u[d]
+        collection[f"rhs{d + 1}"] = rhs[d]
+    data = pd.DataFrame(collection)
+    data.to_csv(f"{name}.csv")
+
+    # Store the constitutive equation.
+    plt.figure()
+    x = np.linspace(0, problem_length, 1001)
+    dx = x[1] - x[0]
+    x_exact, u_exact, rhs_exact = problem.exact(x, material)
+    dudx = np.diff(u_exact) / dx
+    flux = material.field_to_potential(dudx)
+    material.plot(dudx)
+    material_data = pd.DataFrame({'dudx': dudx, 'flux': flux})
+    material_data.to_csv('MaterialData.csv')
     plt.show()
-
-    # # Get the best configuration in DD-error.
-    # configurations.sort('error')
-    # config = configurations.database.iloc[0, 0]
-    # config.plot(x, material=material)
-
-    # # Get the best configuration in distance to the exact solution.
-    # configurations.sort('error_to_exact')
-    # config = configurations.database.iloc[0, 0]
-    # config.plot(x, material=material)
-    #
-    # # Compare the two error norms.
-    # configurations.error(x, parallel=parallel)
-    # configurations.sort('error')
-    # configurations.database.plot.scatter('error', 'error_to_exact')
-    # plt.show()
-
-    # config = configurations.database.iloc[0, 0]
-    # x = np.linspace(0, problem_length, 1001)
-    # config.plot(x, material=material)
-    # print('e= ', config.error(x))
-    # u = config.domain_primal(x)
-    # rhs = config.domain_rhs(x)
-    # collection = {'x': x}
-    # for d in range(domain_num):
-    #     collection[f"u{d + 1}"] = u[d]
-    #     collection[f"rhs{d + 1}"] = rhs[d]
-    # data = pd.DataFrame(collection)
-    # data.to_csv(f"{name}.csv")
-    # plt.show()
