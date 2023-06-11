@@ -104,8 +104,8 @@ class Constitutive(ABC):
         m = self.field_to_potential(u)
 
         plt.plot(u, m)
-        plt.xlabel(_m(r"Curvature $u''$"))
-        plt.ylabel(_m(r"Moment $M$"))
+        plt.xlabel(_m(r"Temperature gradient $\frac{du}{dx}$"))
+        plt.ylabel(_m(r"Heat flux $q$"))
 
 
 class LinearMaterial(Constitutive):

@@ -728,11 +728,11 @@ class ConfigurationDatabase(object):
                 self._launch_multiprocessor_pool()
 
                 # The parallel run.
-                self.database[['configuration', 'error', 'translation',
+                self.database[['configuration', 'cost', 'translation',
                                'success']] = self.database.configuration.parallel_apply(function)
             else:
                 print("    Slow computation because execution is in series.")
-                self.database[['configuration', 'error', 'translation',
+                self.database[['configuration', 'cost', 'translation',
                                'success']] = self.database.configuration.apply(function)
 
     def cost(self, x, order=None, parallel=False):
@@ -752,14 +752,14 @@ class ConfigurationDatabase(object):
 
         See Also
         --------
-        Configuration.error : The function that is called for all configurations.
+        Configuration.cost : The function that is called for all configurations.
         """
 
         # Create partial optimization function that contains all fixed information.
         def function(config):
             """The wrapper around the :py:meth:`Configuration.error` function."""
-            error = config.cost(x, order=order)
-            return error
+            cost = config.cost(x, order=order)
+            return cost
 
         # Apply the optimization function to all configurations.
         if self.num_configurations() == 0:
@@ -770,10 +770,10 @@ class ConfigurationDatabase(object):
                 self._launch_multiprocessor_pool()
 
                 # The parallel run.
-                self.database['error'] = self.database.configuration.parallel_apply(function)
+                self.database['cost'] = self.database.configuration.parallel_apply(function)
             else:
                 print("    Slow computation because execution is in series.")
-                self.database['error'] = self.database.configuration.apply(function)
+                self.database['cost'] = self.database.configuration.apply(function)
 
     def compare_to_exact(self, x, material, parallel=False):
         r"""
