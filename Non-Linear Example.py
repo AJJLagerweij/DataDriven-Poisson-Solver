@@ -58,7 +58,7 @@ from configuration import ConfigurationDatabase
 from problem import Hat
 from test import Laplace_Dirichlet_Dirichlet
 from patch import PatchDatabase
-from constitutive import LinearMaterial, Hardening
+from constitutive import LinearMaterial, Hardening, Softening
 
 # Setup basic plotting properties.
 plt.close('all')
@@ -80,41 +80,45 @@ if __name__ == "__main__":
     parallel = True
 
     # Problem definition.
-    problem_length = 1000.  # Length of the problem in mm.
-    problem_h = 200.  # Width of the hat function in mm.
-    problem_rhs = 0.2  # Right hand side heating in W / mm.
+    problem_length = 1.  # Length of the problem in mm.
+    problem_h = 0.2  # Width of the hat function in mm.
+    problem_rhs = 1.  # Right hand side heating in W / mm.
     problem_a = 0.00  # Left boundary value in degreeC.
-    problem_b = -5.  # Right boundary value in degreeC.
-    domain_num = 4  # 16 # Amount subdomains.
-    domain_length = 287.5  # 109.375 # Length of the subdomains in mm.
+    problem_b = -0.05  # Right boundary value in degreeC.
+    # domain_num = 2  # Amount subdomains.
+    # domain_length = 0.525  # Length of the subdomains in mm.
+    # domain_num = 4
+    # domain_length = 0.2875
+    domain_num = 8
+    domain_length = 0.16875
     problem = Hat(problem_length, problem_h, problem_rhs, problem_a, problem_b, domain_length, domain_num)
 
     # Material definition, required for the test, and verification of the exact solution.
-    material = Hardening(2e6, 1000)  # Hardening relation between temperature gradient and heat flux.
+    material = Softening(250, 1)  # Hardening relation between temperature gradient and heat flux.
 
     # Create empty database.
     database = PatchDatabase()
 
     # Perform test according to the following test matrix.
-    specimen_length = [1000.]  # Specimen length in mm.
+    specimen_length = [1.]  # Specimen length in mm.
     rhs_list = [
-                # partial(rhs_hats, [(400, 600, 0.2)]),  # Exactly the problem, and thus also the exact solution.
-                partial(rhs_hats, [(  0,  600, 0.20)]),  # Smallest, small, medium, large and largest database.
-                partial(rhs_hats, [(  0,  400, 0.20)]),  # Smallest, small, medium, large and largest database.
-                partial(rhs_hats, [(400, 1000, 0.20)]),  # Smallest, small, medium, large and largest database.
-                partial(rhs_hats, [(600, 1000, 0.20)]),  # Smallest, small, medium, large and largest database.
-                # partial(rhs_hats, [(300,  500, 0.20)]),  # Small, medium, large and largest database.
-                # partial(rhs_hats, [(500,  700, 0.20)]),  # Small, medium, large and largest database.
-                # partial(rhs_hats, [(300,  700, 0.10)]),  # Medium, large and largest database.
-                # partial(rhs_hats, [(450,  555, 0.40)]),  # Medium, large and largest database.
-                # partial(rhs_hats, [(  0,  400, 0.20), (0.80, 1.00, 1.00)]),  # Large and largest database.
-                # partial(rhs_hats, [(  0,  400, 0.20), (0.80, 1.00, 0.50)]),  # Large and largest database.
-                # partial(rhs_hats, [(  0,  200, 0.20), (0.40, 0.60, 1.00), (0.80, 1.00, 1.00)]),  # Largest database.
-                # partial(rhs_hats, [(  0,  200, 0.10), (0.40, 0.60, 1.00), (0.80, 1.00, 0.50)]),  # Largest database.
+                # partial(rhs_hats, [(0.4, 0.6, 1.)]),  # Exactly the problem, and thus also the exact solution.
+                partial(rhs_hats, [(0.00, 0.60, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.00, 0.40, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.40, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.60, 1.00, 1.00)]),  # Smallest, small, medium, large and largest database.
+                partial(rhs_hats, [(0.30, 0.50, 1.00)]),  # Small, medium, large and largest database.
+                partial(rhs_hats, [(0.50, 0.70, 1.00)]),  # Small, medium, large and largest database.
+                # partial(rhs_hats, [(0.30, 0.70, 0.50)]),  # Medium, large and largest database.
+                # partial(rhs_hats, [(0.45, 0.55, 2.00)]),  # Medium, large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00), (0.80, 1.00, 1.00)]),  # Large and largest database.
+                # partial(rhs_hats, [(0.00, 0.40, 1.00), (0.80, 1.00, 0.50)]),  # Large and largest database.
+                # partial(rhs_hats, [(0.00, 0.20, 1.00), (0.40, 0.60, 1.00), (0.80, 1.00, 1.00)]),  # Largest database.
+                # partial(rhs_hats, [(0.00, 0.20, 0.50), (0.40, 0.60, 1.00), (0.80, 1.00, 0.50)]),  # Largest database.
                 ]  # Potential rhs equations
 
     # Perform the testing and add the result to the database.
-    specimen_dx = 0.1  # mm discretization step size (measurement spacial resolution)
+    specimen_dx = 0.001  # mm discretization step size (measurement spacial resolution)
     for length in specimen_length:
         for rhs in rhs_list:
             test = Laplace_Dirichlet_Dirichlet(length, specimen_dx, 0, 0, rhs, material)
@@ -125,7 +129,7 @@ if __name__ == "__main__":
     database.plot()
 
     # Either create a configurations-database from patch admissibility or from loading previous simulation results.
-    name = f'Homogeneous-Simulation d {domain_num} p {database.num_patches()}'
+    name = f'Convergence d {domain_num} p {database.num_patches()}'
     configurations = ConfigurationDatabase.create_from_problem_patches(problem, database)  # From patch admissibility.
     # configurations = ConfigurationDatabase.create_from_load(f'{name}.pkl.gz')  # Load previous simulation results.
 
@@ -144,8 +148,13 @@ if __name__ == "__main__":
     config = configurations.database.iloc[0, 0]
     config.plot(x, material=material)
 
+    # # Exporting the exact solution.
+    # exact_x, exact_u, exact_rhs = problem.exact(x, material)
+    # exact = {'x': exact_x, 'u': exact_u, 'rhs': exact_rhs}
+    # exact = pd.DataFrame(exact)
+    # exact.to_csv(f'ExactSolution.csv')
+
     # Exporting the solution for plotting.
-    config = configurations.database.iloc[0, 0]
     x = np.linspace(0, problem_length, 1001)
     print('e= ', config.cost(x))
     u = config.domain_primal(x)
@@ -157,23 +166,4 @@ if __name__ == "__main__":
     data = pd.DataFrame(collection)
     data.to_csv(f"{name}.csv")
 
-    # Exporting the database for plotting.
-    data = {}
-    for p, patch in enumerate(database.database):
-        data[f'x{p}'] = patch.x
-        data[f'u{p}'] = patch.u
-        data[f'rhs{p}'] = patch.rhs
-    data = pd.DataFrame(data)
-    data.to_csv("Database.csv")
-
-    # Export constitutive equation for plotting.
-    plt.figure()
-    x = np.linspace(0, problem_length, 1001)
-    dx = x[1] - x[0]
-    x_exact, u_exact, rhs_exact = problem.exact(x, material)
-    dudx = np.diff(u_exact) / dx
-    flux = material.field_to_potential(dudx)
-    material.plot(dudx)
-    material_data = pd.DataFrame({'dudx': dudx, 'flux': flux})
-    material_data.to_csv('MaterialData.csv')
     plt.show()
